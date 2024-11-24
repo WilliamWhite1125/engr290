@@ -10,7 +10,6 @@
 #define SDA_PIN PC4              // I2C SDA
 #define SCL_PIN PC5              // I2C SCL
 #define LED_L_PIN PB5            // Onboard LED
-#define LED_D3_PIN PB3           // PWM LED 
 #define HOVER_FAN_PIN PD6        // Hover fan ???
 #define PROPULSION_FAN_PIN PD5   // Propulsion fan ???
 
