@@ -3,23 +3,27 @@
 #include <util/delay.h>
 #include <math.h>
 
-// Constants and Macros
-#define F_CPU 16000000UL          // 16 MHz clock speed
-#define IMU_ADDRESS 0x68          // MPU-6050 I2C address
-#define I2C_DELAY_US 5            // I2C communication delay in microseconds
+// Constants
+#define F_CPU 16000000UL         // Clock speed
 
-#define SDA_PIN PC4               // SDA connected to PC4 (Arduino A4)
-#define SCL_PIN PC5               // SCL connected to PC5 (Arduino A5)
+// Pin Definitions
+#define SDA_PIN PC4              // I2C SDA
+#define SCL_PIN PC5              // I2C SCL
+#define LED_L_PIN PB5            // Onboard LED
+#define LED_D3_PIN PB3           // PWM LED 
+#define HOVER_FAN_PIN PD6        // Hover fan ???
+#define PROPULSION_FAN_PIN PD5   // Propulsion fan ???
 
-#define LED_L_PIN PB5             // LED "L" pin (Arduino pin 13)
-#define LED_D3_PIN PB3            // LED D3 pin (OC2A, Arduino pin 11)
+// Timer Prescaler
+#define TIMER0_PRESCALER 64
 
-//function prototypes
-void startFan();
+// Function Prototypes
+void startHoverFan();
+void startPropulsionFan();
 void stopFan();
 
 //function implementations 
-//BOTH ARE THE SAME RN
+//ALL ARE THE SAME RN
 void startHoverFan(){
     TCCR0A|=(1<<COM0A1); // non-inverted pin operation
     TCCR0A|=(1<<WGM00); // PWM, Phase Correct
