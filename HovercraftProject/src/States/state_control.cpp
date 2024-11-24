@@ -36,13 +36,12 @@
 #define PROPULSION_FAN_PIN PD5   // Propulsion fan ???
 
 // Define states
-enum State { INIT,
-             IDLE,
-             SCAN,
-             MOVE,
-             GOAL,
-             STOP };
+enum State { INIT, IDLE, SCAN, MOVE, GOAL, STOP };
 State currentState = INIT;
+
+//could use this to check if the setup is complete
+enum Status{SUCCESS, FAILURE};
+State initStatus=FAILURE;
 
 // Constants
 #define DISTANCE_THRESHOLD 40         //cm //adjust based on testing results
@@ -50,7 +49,7 @@ State currentState = INIT;
 
 // Function prototypes
 void setupSystem();         //TODO
-void handleState();         //almostdone
+void handleState();         //DONE
 void scanEnvironment();     //DONE
 bool isGoalDetected();      //TODO
 bool isObstacleDetected();  //DONE
@@ -61,9 +60,12 @@ void handleState() {
 
     case INIT:  //DONE
       //Set up sensors and actuators (IMU, fans, servo, IR, ultrasonic sensor).
-      setupSystem();
-      //if setup complete
-      currentState = IDLE;
+      while(initStatus == FAILURE){
+        setupSystem();
+      if(initStatus == SUCCESS){
+        currentState = IDLE;
+      }
+      }
       break;
 
     case IDLE:  //DONE
@@ -162,7 +164,7 @@ bool isObstacleDetected() {
   return distance < DISTANCE_THRESHOLD;
 }
 
-void setupSystem() {
+void setupSystem() { //SETUP FUNCTION FOR ALL SUBSYSTEMS
   cli(); // Disable global interrupts
 
   // ********** Setup code from demo1.ino **********
@@ -179,7 +181,7 @@ void setupSystem() {
     TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
     TCCR2B |= (1 << CS22); 
 
-    // ********** Setup code from sensor_control.ino **********
+    // ********** Setup code from sensor_control.cpp **********
 
     // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
@@ -230,4 +232,6 @@ void setupSystem() {
     previous_time = customMillis();
 
     UART_println("Calibration complete.");
+
+    return SUCCESS; //RIGHT NOW ALWAYS RETURNS SUCCESS
 }
