@@ -45,13 +45,14 @@ State initStatus=FAILURE;
 
 // Constants
 #define DISTANCE_THRESHOLD 40         //cm //adjust based on testing results
-#define GOAL_DETECTION_THRESHOLD 20  // Adjust based on IR sensor data
+#define GOAL_LOW 20  // Adjust based on IR sensor data
+#define GOAL_HIGH 50  // Adjust based on IR sensor data
 
 // Function prototypes
-void setupSystem();         //TODO
+void setupSystem();         //COPIED FROM SETUPS IN DEMOS, MAYBE MISSING SOME
 void handleState();         //DONE
 void scanEnvironment();     //DONE
-bool isGoalDetected();      //TODO
+bool isGoalDetected();      //DONE
 bool isObstacleDetected();  //DONE
 
 void handleState() {
@@ -92,17 +93,13 @@ void handleState() {
       if (isObstacleDetected()) {
         currentState = SCAN;
       } else if (isGoalDetected()) {
-        currentState = GOAL;
+        currentState = STOP;
       }
       break;
 
-    case GOAL:  //TODO
-                //Use the IR sensor to detect the bar above the hovercraft at the maze's end.
-                // Detect the goal and stop under the bar
-      stopFan();
-      if (isGoalDetected()) {
-        currentState = STOP;
-      }
+    case GOAL:  //TODO, OR NOT
+    //Use the IR sensor to detect the bar above the hovercraft at the maze's end.
+    // Detect the goal and stop under the bar
       break;
 
     case STOP:  //DONE
@@ -155,7 +152,7 @@ void scanEnvironment() {
 bool isGoalDetected() {
   // Use IR sensor to check for the goal
   float irReading = measureIRDistance();  // Assume measureIR() returns the IR sensor reading
-  return irReading > GOAL_DETECTION_THRESHOLD; //minumim reading is 20cm
+  return (irReading > GOAL_LOW && irReading < GOAL_HIGH); //minumim reading is 20cm
 }
 
 bool isObstacleDetected() {
