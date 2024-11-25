@@ -27,13 +27,13 @@
 
 #define LED_L_PIN PB5             // LED "L" pin (Arduino pin 13)
 #define LED_D3_PIN PB3            // LED D3 pin (OC2A, Arduino pin 11)
-#define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5)
+#define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5) WITH TIMER 0
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
 
-#define HOVER_FAN_PIN PD6        // Hover fan ???
-#define PROPULSION_FAN_PIN PD5   // Propulsion fan ???
+#define HOVER_FAN_PIN PB1        // Hover fan ??? WITH TIMER 1
+#define PROPULSION_FAN_PIN PB2   // Propulsion fan ??? WITH TIMER 1
 
 // Define states
 enum State { INIT, IDLE, SCAN, MOVE, GOAL, STOP };
