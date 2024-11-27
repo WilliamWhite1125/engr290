@@ -22,15 +22,19 @@ int main() {
 
     while (1) {
         startHoverFan();              // Turn on hover fan
-        startPropulsionFan(128);      // Set propulsion fan to 50% duty cycle
-        _delay_ms(2000);
+       startPropulsionFan(128);      // Set propulsion fan to 50% duty cycle
+        _delay_ms(20000);
+        startPropulsionFan(255);      // Set propulsion fan to 100% duty cycle
+        _delay_ms(20000);
 
         stopHoverFan();               // Turn off hover fan
-        stopPropulsionFan();          // Stop propulsion fan
-        _delay_ms(2000);
+       stopPropulsionFan();          // Stop propulsion fan
+        _delay_ms(20000);
     }
 }
 */
+
+
 
 // Hover Fan (PD4) Control
 void startHoverFan() {
@@ -46,16 +50,20 @@ void startPropulsionFan(uint8_t dutyCycle) {
     static uint8_t timerInitialized = 0;
     if (!timerInitialized) {
         // Configure Timer 1 for Fast PWM, 8-bit mode
-        TCCR1A |= (1 << WGM10);       // Fast PWM, 8-bit
-        TCCR1A |= (1 << COM1A1);      // Non-inverting mode on 0C0A (PD6)
-        TCCR1B |= (1 << WGM12);       // Fast PWM, part 2
-        TCCR1B |= (1 << CS11) | (1 << CS10); // Prescaler 64 (PWM ~490 Hz)
+        TCCR0A |= (1 << WGM00);       // Fast PWM, 8-bit
+        TCCR0A |= (1 << WGM01);       // Fast PWM, part 2
+        TCCR0A |= (1 << COM0A1); // Non-inverting mode on 0C0A (PD6)
+        TCCR0A |= (1 << COM0B1); 
+  
+        TCCR0B |= (1 << WGM02);  
+        TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64 (PWM ~490 Hz)
 
         timerInitialized = 1; // Mark Timer 1 as initialized
     }
-    0CR0A = dutyCycle; // Set duty cycle for propulsion fan (0-255)
+    OCR0A = dutyCycle; // Set duty cycle for propulsion fan (0-255)
 }
 
 void stopPropulsionFan() {
-    0CR0A = 0; // Set duty cycle to 0 to stop propulsion fan
+    OCR0A = 0; // Set duty cycle to 0 to stop propulsion fan
 }
+
