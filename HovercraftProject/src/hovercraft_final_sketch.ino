@@ -38,6 +38,8 @@ Status initStatus=FAILURE;
 
 //global variables
 volatile unsigned long milliseconds = 0; // Millisecond counter for timing
+unsigned long lastOutputTime = 0;
+unsigned long previous_time = 0;
 float servo_angle = 90.0; // Initialize to middle position
 
 // Function Prototypes
@@ -57,8 +59,38 @@ bool isObstacleDetected();
 long measureUltrasonicDistance();
 void servo_write(uint16_t angle);
 void setupPWM();
+void I2C_init();
+void I2C_start();
+void I2C_stop();
+uint8_t I2C_write_byte(uint8_t data);
+uint8_t I2C_read_byte(uint8_t ack);
+void SDA_HIGH();
+void SDA_LOW();
+void SCL_HIGH();
+void SCL_LOW();
+uint8_t SDA_READ();
+void UART_init(unsigned int baudrate);
+void UART_transmit(unsigned char data);
+void UART_print(const char* str);
+void UART_println(const char* str);
+void UART_printFloat(float number, int decimalPlaces);
+void delay_ms(unsigned int ms);
+void delay_us(unsigned int us);
+unsigned long customMillis();
+
+ISR(TIMER1_COMPA_vect) {
+    milliseconds++;
+}
 
 void setup(){
+  cli(); // Disable global interrupts
+  
+  // Setup Timer1 for millisecond timing
+    TCCR1A = (1 << WGM11); // CTC mode
+    OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
+    TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
+    TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
+  
   // Initialize pins
   DDRD |= (1 << HOVER_FAN_PIN) | (1 << PROPULSION_FAN_PIN); // Set PD4 and PD6 as outputs
   DDRB |= (1 << TRIG_PIN);  // TRIG_PIN output
@@ -70,9 +102,29 @@ void setup(){
   TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
   TCCR2B |= (1 << CS22);
 
- //start servo in the middle
+   // Setup Timer0 for millisecond timing
+    TCCR0A = (1 << WGM01); // CTC mode
+    OCR0A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
+    TIMSK0 = (1 << OCIE0A); // Enable Timer0 compare match interrupt
+    TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
+
+  // Setup UART for serial communication
+    UART_init(9600);
+
+    // Setup I2C
+    I2C_init();
+
+  //start servo in the middle
   servo_write((uint16_t)servo_angle);
-   _delay_ms(4000);  // Allow sensor to stabilize
+  _delay_ms(4000);  // Allow sensor to stabilize
+
+  //imu setup code here
+
+  sei(); // Enable global interrupts
+
+  previous_time = customMillis();
+
+  UART_println("Calibration complete.");
 }
 
 int main() {
@@ -156,7 +208,7 @@ void stopHoverFan() {
 void startPropulsionFan(uint8_t dutyCycle) {
     static uint8_t timerInitialized = 0;
     if (!timerInitialized) {
-        // Configure Timer 1 for Fast PWM, 8-bit mode
+        // Configure Timer 0 for Fast PWM, 8-bit mode
         TCCR0A |= (1 << WGM00);       // Fast PWM, 8-bit
         TCCR0A |= (1 << WGM01);       // Fast PWM, part 2
         TCCR0A |= (1 << COM0A1); // Non-inverting mode on 0C0A (PD6)
@@ -165,7 +217,7 @@ void startPropulsionFan(uint8_t dutyCycle) {
         TCCR0B |= (1 << WGM02);  
         TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64 (PWM ~490 Hz)
 
-        timerInitialized = 1; // Mark Timer 1 as initialized
+        timerInitialized = 1; // Mark Timer 0 as initialized
     }
     OCR0A = dutyCycle; // Set duty cycle for propulsion fan (0-255)
 }
