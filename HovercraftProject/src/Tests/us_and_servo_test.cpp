@@ -7,11 +7,12 @@
 
 #define MIN_SERVO_ANGLE 0         // Minimum servo angle
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
-#define DISTANCE_THRESHOLD 40     //(cm)  adjust based on testing results
+#define DISTANCE_THRESHOLD 30     //(cm)  adjust based on testing results
 
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
 // Global variables
+volatile unsigned long milliseconds = 0; // Millisecond counter for timing
 float servo_angle = 90.0; // Initialize to middle position
 enum State { INIT, IDLE, SCAN, MOVE };
 State currentState = INIT;
@@ -28,7 +29,7 @@ void setupPWM();
 //functions
 void setup(){
   Serial.begin(9600);
-  Serial.print("CURRENT STATE INIT")
+  Serial.println("CURRENT STATE INIT");
     
   // Set TRIG_PIN as output, ECHO_PIN as input
   DDRB |= (1 << TRIG_PIN);  // TRIG_PIN output
@@ -71,15 +72,15 @@ void handleState() {
   switch (currentState) {
 
     case IDLE:  //DONE
-      Serial.print("CURRENT STATE IDLE")
-      Serial.print("StopFans()");
+      Serial.println("CURRENT STATE IDLE");
+      Serial.println("StopFans()");
       _delay_ms(1000);  // Wait for stability
       //switches to scan when it stops moving
       currentState = SCAN;
       break;
 
     case SCAN:  //DONE
-      Serial.print("CURRENT STATE SCAN")
+      Serial.println("CURRENT STATE SCAN");
                 // Scan the environment to find the best path forward
       scanEnvironment();
       // Transition to MOVE if a viable path is found
@@ -87,15 +88,15 @@ void handleState() {
       break;
 
     case MOVE:  //DONE
-      Serial.print("CURRENT STATE MOVE")
+      Serial.println("CURRENT STATE MOVE");
                 // Start fans and move forward
-      Serial.print("startHoverFan()");
-      Serial.print("startPropulsionFan()");
+      Serial.println("startHoverFan()");
+      Serial.println("startPropulsionFan()");
       _delay_ms(4000);  // Wait ~ 4s to not immediately cycle back to scan
 
       // Monitor for obstacles and transition accordingly
       if (isObstacleDetected()) {
-        Serial.print("Obstacle Detected");
+        Serial.println("Obstacle Detected");
         currentState = SCAN;
       }
       break;
@@ -109,18 +110,18 @@ void scanEnvironment() {
   for (int angle = 0; angle <= 180; angle += 15) {
     servo_angle = angle;
     servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-    servo_write((uint16_t)servo_angle)
+    servo_write((uint16_t)servo_angle);
     _delay_ms(100);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
     long distance = measureUltrasonicDistance();
 
     //output for testing
-    Serial.print("Distance at ");
-    Serial.print(angle, 2);
-    Serial.print("* degrees is ");
-    Serial.print(distance, 2);
-    Serial.print(" cm");
+    Serial.println("Distance at ");
+    Serial.println(angle);
+    Serial.println("* degrees is ");
+    Serial.println(distance);
+    Serial.println(" cm");
 
     // dont want to lock onto the wall nearby
     if (distance > 25 && distance > maxDistance) {
@@ -134,9 +135,9 @@ void scanEnvironment() {
   servo_write((uint16_t)servo_angle);
 
   //output for testing
-  Serial.print("Chosen Angle is ");
-  Serial.print(servo_angle, 2);
-  Serial.print(" degrees");
+  Serial.println("Chosen Angle is ");
+  Serial.println(servo_angle);
+  Serial.println(" degrees");
 }
 bool isObstacleDetected() {
   // Check if the ultrasonic sensor detects an obstacle within threshold
@@ -175,3 +176,21 @@ void setupPWM() {
     ICR1 = 20000; // 20ms period
     OCR1A = 1500; // Center position (1.5ms pulse)
 }
+void delay_ms(unsigned int ms) {
+    unsigned long start = customMillis();
+    while (customMillis() - start < ms);
+}
+
+void delay_us(unsigned int us) {
+    while (us--) {
+        _delay_us(1); // Use built-in function for accuracy
+    }
+}
+unsigned long customMillis() {
+    unsigned long ms;
+    cli();
+    ms = milliseconds;
+    sei();
+    return ms;
+}
+
