@@ -37,7 +37,8 @@ void setup(){
   
   // Setup Servo pin
   DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
-  setupPWM();
+  servo_write((uint16_t)servo_angle);
+   _delay_ms(4000);  // Allow sensor to stabilize
   currentState = IDLE;
 }
 //***************************//
@@ -111,7 +112,7 @@ void scanEnvironment() {
     servo_angle = angle;
     servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
     servo_write((uint16_t)servo_angle);
-    _delay_ms(100);  // Allow sensor to stabilize
+    _delay_ms(1000);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
     long distance = measureUltrasonicDistance();
@@ -193,4 +194,3 @@ unsigned long customMillis() {
     sei();
     return ms;
 }
-
