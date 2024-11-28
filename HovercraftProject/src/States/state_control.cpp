@@ -3,8 +3,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
-#include "sensor_control.ino"
-#include "fan_control.ino"
 
 #define ECHO_PIN PD2
 #define LED_PIN PD3
