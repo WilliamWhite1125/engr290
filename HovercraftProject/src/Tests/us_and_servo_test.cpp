@@ -16,6 +16,7 @@ volatile unsigned long milliseconds = 0; // Millisecond counter for timing
 float servo_angle = 90.0; // Initialize to middle position
 enum State { INIT, IDLE, SCAN, MOVE };
 State currentState = INIT;
+float currentSpeed = 0;
 
 // Function Prototypes
 void setup();
@@ -26,8 +27,21 @@ long measureUltrasonicDistance();
 void servo_write(uint16_t angle);
 void setupPWM();
 
+ISR(TIMER1_COMPA_vect) {
+    milliseconds++;
+}
+
 //functions
 void setup(){
+
+  float servo_angle = 90.0;
+
+   // Setup Timer1 for millisecond timing
+    TCCR1A = (1 << WGM11); // CTC mode
+    OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
+    TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
+    TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
+  
   Serial.begin(9600);
   Serial.println("CURRENT STATE INIT");
     
@@ -38,7 +52,10 @@ void setup(){
   // Setup Servo pin
   DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
   servo_write((uint16_t)servo_angle);
-   _delay_ms(4000);  // Allow sensor to stabilize
+  _delay_ms(1000);  // Allow sensor to stabilize
+   
+  
+  currentSpeed = 255;
   currentState = IDLE;
 }
 //***************************//
@@ -112,7 +129,7 @@ void scanEnvironment() {
     servo_angle = angle;
     servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
     servo_write((uint16_t)servo_angle);
-    _delay_ms(1000);  // Allow sensor to stabilize
+    _delay_ms(100);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
     long distance = measureUltrasonicDistance();
