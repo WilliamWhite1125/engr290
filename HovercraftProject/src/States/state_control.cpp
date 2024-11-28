@@ -30,8 +30,8 @@
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
 
-#define HOVER_FAN_PIN PB1        // Hover fan ??? WITH TIMER 1
-#define PROPULSION_FAN_PIN PB2   // Propulsion fan ??? WITH TIMER 1
+#define HOVER_FAN_PIN PD4        // Hover fan (Fan 1) - On/Off
+#define PROPULSION_FAN_PIN PD6   // Propulsion fan (Fan 2) - PWM (0C0A)
 
 // Define states
 enum State { INIT, IDLE, SCAN, MOVE, GOAL, STOP };
