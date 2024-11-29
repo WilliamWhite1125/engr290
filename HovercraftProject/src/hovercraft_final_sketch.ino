@@ -20,8 +20,8 @@
 #define MIN_YAW -85               // Minimum yaw angle
 #define MAX_YAW 85               // Maximum yaw angle
 
-#define MIN_SERVO_ANGLE 0         // Minimum servo angle
-#define MAX_SERVO_ANGLE 180       // Maximum servo angle
+// Minimum servo angle
+// Maximum servo angle
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
@@ -40,7 +40,7 @@ Status initStatus=FAILURE;
 volatile unsigned long milliseconds = 0; // Millisecond counter for timing
 unsigned long lastOutputTime = 0;
 unsigned long previous_time = 0;
-float servo_angle = 90.0; // Initialize to middle position
+// Initialize to middle position
 
 // Function Prototypes
 void startHoverFan();
@@ -57,7 +57,7 @@ void handleState();
 void scanEnvironment();
 bool isObstacleDetected();
 long measureUltrasonicDistance();
-void servo_write(uint16_t angle); //OLD SERVO FN
+//OLD SERVO write FN
 void setupPWM(); //OLD SERVO FN
 void I2C_init();
 void I2C_start();
@@ -85,7 +85,7 @@ ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU 
 void setup(){
   cli(); // Disable global interrupts
   
-  // Setup Timer1 for millisecond timing
+ // Setup Timer1 for millisecond timing
     TCCR1A = (1 << WGM11); // CTC mode
     OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
@@ -98,9 +98,9 @@ void setup(){
   DDRC &= ~(1 << IR_PIN); //ir pin input
   DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
 
-  //timer 2
+  /*//timer 2
   TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
-  TCCR2B |= (1 << CS22);
+  TCCR2B |= (1 << CS22);*/
 
    // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
@@ -115,7 +115,7 @@ void setup(){
     I2C_init();
 
   //start servo in the middle
-  servo_write((uint16_t)servo_angle); //OLD SERVO
+  //OLD SERVO
   _delay_ms(4000);  // Allow sensor to stabilize
 
   //imu setup code here
@@ -254,27 +254,7 @@ unsigned long customMillis() {
     sei();
     return ms;
 }
-void servo_write(uint16_t angle) {
-    // Constrain the angle within 0 to 180 degrees
-    angle = constrain(angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-
-    // Convert angle to pulse width (1 ms to 2 ms)
-    uint16_t pulse_width_us = ((angle * 1000UL) / 180UL) + 1000UL; // 1000us to 2000us
-
-    // Generate the servo pulse
-    // Start of pulse
-    PORTD |= (1 << PD5);
-    delay_us(pulse_width_us); // Keep pin high for the duration of the pulse
-
-    // End of pulse
-    PORTD &= ~(1 << PD5);
-
-    // Wait for the remainder of the 20 ms period
-    unsigned long pulse_duration_ms = pulse_width_us / 1000;
-    if (pulse_duration_ms < 20) {
-        delay_ms(20 - pulse_duration_ms);
-    }
-}
+//servo write
 //DONE
 long measureUltrasonicDistance() {
     long duration; 
