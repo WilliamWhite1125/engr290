@@ -323,3 +323,47 @@ void update_servo(const char* direction) {
   // Set the PWM value for the servo motor
   OCR1A = servo_index;  // Update PWM for the servo motor
 }
+// Initialization of the UART for serial communication
+void UART_init() {
+    // Set baud rate
+    UBRR0H = (MYUBRR >> 8);
+    UBRR0L = MYUBRR;
+    // Enable receiver and transmitter
+    UCSR0B = (1 << RXEN0) | (1 << TXEN0);
+    // Set frame format: 8data, 1stop bit
+    UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
+}
+
+// Transmit a single character over UART 
+void UART_putc(char c) {
+    while (!(UCSR0A & (1 << UDRE0))); // Wait until the transmit buffer is empty 
+    UDR0 = c; // Put character into buffer 
+}
+
+// Transmit a string over UART 
+void UART_puts(const char *s) {
+    while (*s) {
+        UART_putc(*s++);
+    }
+}
+//Transmit float
+void UART_putfloat(float value) {
+    int int_part = (int)value; // Get integer part
+    int decimal_part = (int)((value - int_part) * 100); // Get two decimal places
+
+    // Handle negative values for correct formatting
+    if (decimal_part < 0) decimal_part = -decimal_part;
+
+    // Prepare the string representation
+    char buffer[20];
+    sprintf(buffer, "%d.%02d", int_part, decimal_part); // Format as "X.XX"
+    UART_puts(buffer); // Send the string over UART
+}
+
+// Print an integer over UART 
+void UART_putint(uint32_t num) {
+    char buffer[10];
+    itoa(num, buffer, 10);  // Convert integer to string 
+    UART_puts(buffer);      // Send string 
+}
+// UART Ends Here. Delete later.
