@@ -1,5 +1,12 @@
+extern "C" {
+    #include "init_290.h"
+    #include "TWI_290.h"  // Include TWI library for I2C communication
+}
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdlib.h>
+#include <math.h>
+#include <stdio.h>
 
 // Pin Definitions
 #define LED_PIN PB5            // Onboard LED
@@ -13,15 +20,14 @@
 #define IR_PIN PC0  
 
 // Constants
-#define F_CPU 16000000UL         // Clock speed
+#define F_CPU 16000000UL // CPU frequency
+#define BAUD 9600 // Desired baud rate
+#define MYUBRR F_CPU/16/BAUD-1 // UBRR calculation
 
 #define IMU_ADDRESS 0x68          // MPU-6050 C address
 #define C_DELAY_US 5            // I2C communication delay in microseconds
 #define MIN_YAW -85               // Minimum yaw angle
 #define MAX_YAW 85               // Maximum yaw angle
-
-#define MIN_SERVO_ANGLE 0         // Minimum servo angle
-#define MAX_SERVO_ANGLE 180       // Maximum servo angle
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
@@ -70,10 +76,10 @@ enum Status{SUCCESS, FAILURE}; //could use this to check if the setup is complet
 Status initStatus=FAILURE;
 
 //global variables
-volatile unsigned long milliseconds = 0; // Millisecond counter for timing
+volatile unsigned long timer_millis;
 unsigned long lastOutputTime = 0;
 unsigned long previous_time = 0;
-float servo_angle = 90.0; // Initialize to middle position
+// Initialize to middle position
 
 // Function Prototypes
 void MPU6050_init();
@@ -97,7 +103,10 @@ void handleState();
 void scanEnvironment();
 bool isObstacleDetected();
 long measureUltrasonicDistance();
-void servo_write(uint16_t angle); //OLD SERVO FN
+
+//OLD SERVO write FN
+void setupPWM(); //OLD SERVO FN
+
 void I2C_init();
 void I2C_start();
 void I2C_stop();
@@ -117,19 +126,29 @@ void delay_ms(unsigned int ms); //OLD SERVO FN? DOES IMU USE?
 void delay_us(unsigned int us); //OLD SERVO FN? DOES IMU USE?
 unsigned long customMillis(); //OLD SERVO FN? DOES IMU USE?
 
-ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU REMOVE
-    milliseconds++;
+ISR(TIMER0_COMPA_vect) {
+  timer_millis++; // Increment the millisecond counter
 }
-
+unsigned long millis2() {
+  return timer_millis; // Return the current millisecond count
+}
+void setup_timer() {
+    TCCR0A |= (1 << WGM01); // Set Timer0 to CTC mode
+    TCCR0B |= (1 << CS01);  // Set prescaler to 8
+    OCR0A = 199;            // Set compare value for 1 ms
+    TIMSK0 |= (1 << OCIE0A);// Enable compare interrupt
+    sei();                  // Enable global interrupts
+}
 void setup(){
   cli(); // Disable global interrupts
-  
-  // Setup Timer1 for millisecond timing
+     setup_timer();
+     UART_puts("System Initializing...\r\n");
+  _delay_ms(200);
+ // Setup Timer1 for millisecond timing
     TCCR1A = (1 << WGM11); // CTC mode
     OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
     TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
-  
   // Initialize pins
   DDRD |= (1 << HOVER_FAN_PIN) | (1 << PROPULSION_FAN_PIN); // Set PD4 and PD6 as outputs
   DDRB |= (1 << TRIG_PIN);  // TRIG_PIN output
@@ -137,30 +156,29 @@ void setup(){
   DDRC &= ~(1 << IR_PIN); //ir pin input
   DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
 
-  //timer 2
-  TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
-  TCCR2B |= (1 << CS22);
+   // Setup Timer0 for millisecond timing
 
-    // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
     OCR0A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK0 = (1 << OCIE0A); // Enable Timer0 compare match interrupt
     TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
 
-    Serial.begin(9600);
+  // Setup UART for serial communication
+    UART_init(9600);
 
     // Setup I2C
     I2C_init();
-
   //start servo in the middle
+
+   pwm_init(); // Initialize PWM
+ _delay_ms(200);
+  sei(); // Enable global interrupts
+  previous_time = customMillis();
+  UART_println("Calibration complete.");
   servo_write((uint16_t)servo_angle); //OLD SERVO
   _delay_ms(4000);  // Allow sensor to stabilize
 
   UART_println("Calibration complete.");
-
-
-    // Initialize PWM for LED D3 brightness control
-    setupPWM();
 
     // Initialize MPU6050
     MPU6050_init();
@@ -187,12 +205,13 @@ void setup(){
     sei(); // Enable global interrupts
 
     previous_time = customMillis();
+
 }
 
 int main() {
 
     while (1) {
-        //main code
+        handleState();
     }
 }
 void handleState() {
@@ -316,27 +335,7 @@ unsigned long customMillis() {
     sei();
     return ms;
 }
-void servo_write(uint16_t angle) {
-    // Constrain the angle within 0 to 180 degrees
-    angle = constrain(angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-
-    // Convert angle to pulse width (1 ms to 2 ms)
-    uint16_t pulse_width_us = ((angle * 1000UL) / 180UL) + 1000UL; // 1000us to 2000us
-
-    // Generate the servo pulse
-    // Start of pulse
-    PORTD |= (1 << PD5);
-    delay_us(pulse_width_us); // Keep pin high for the duration of the pulse
-
-    // End of pulse
-    PORTD &= ~(1 << PD5);
-
-    // Wait for the remainder of the 20 ms period
-    unsigned long pulse_duration_ms = pulse_width_us / 1000;
-    if (pulse_duration_ms < 20) {
-        delay_ms(20 - pulse_duration_ms);
-    }
-}
+//servo write
 //DONE
 long measureUltrasonicDistance() {
     long duration; 
@@ -369,6 +368,7 @@ float measureIRDistance() {
 
     return distance;
 }
+
 
 void I2C_init() {
     PORTC |= (1 << PC4) | (1 << PC5); // Enable pull-up resistors on SDA and SCL
@@ -606,4 +606,83 @@ void setupPWM() {
     TCCR2B = (1 << CS21); // Prescaler 8
     OCR2A = 0; // Initial duty cycle
 }
+
+
+// Initialize PWM for servo control and D3
+void pwm_init() {
+    DDRB |= (1 << PORTB1); // Set PB1 as output
+    TCCR1A  |= (1 << COM1A1) | (1 << COM1B1); // non-inv PWM on channels A and B
+    TCCR1B |= (1 << WGM13); // Phase and Frequency Correct PWM
+    ICR1 = 39999; // Set TOP value for 50Hz PWM (for servo control)
+    TCCR1B |= ((1 << CS11) | (1 << CS10)); // Prescaler 8, starts PWM
+}
+void update_servo(const char* direction) {
+  uint16_t servo_index;
+
+  // Check the string input and set the servo position based on direction
+  if (strcmp(direction, "straight") == 0) {
+    // Servo points straight
+    servo_index = 185;  
+  } else if (strcmp(direction, "left") == 0) {
+    // Servo points left for a left turn
+    servo_index = 253;  
+  } else if (strcmp(direction, "right") == 0) {
+    // Servo points right for a right turn
+    servo_index = 85;  
+  } else {
+    // Default behavior if the direction is not recognized
+    servo_index = 169.5;  // Set to straight if invalid input
+  }
+
+  // Ensure the servo position is within valid range
+  if (servo_index < 85) servo_index = 85;
+  if (servo_index > 253) servo_index = 253;
+
+  // Set the PWM value for the servo motor
+  OCR1A = servo_index;  // Update PWM for the servo motor
+}
+// Initialization of the UART for serial communication
+void UART_init() {
+    // Set baud rate
+    UBRR0H = (MYUBRR >> 8);
+    UBRR0L = MYUBRR;
+    // Enable receiver and transmitter
+    UCSR0B = (1 << RXEN0) | (1 << TXEN0);
+    // Set frame format: 8data, 1stop bit
+    UCSR0C = (1 << UCSZ01) | (1 << UCSZ00);
+}
+
+// Transmit a single character over UART 
+void UART_putc(char c) {
+    while (!(UCSR0A & (1 << UDRE0))); // Wait until the transmit buffer is empty 
+    UDR0 = c; // Put character into buffer 
+}
+
+// Transmit a string over UART 
+void UART_puts(const char *s) {
+    while (*s) {
+        UART_putc(*s++);
+    }
+}
+//Transmit float
+void UART_putfloat(float value) {
+    int int_part = (int)value; // Get integer part
+    int decimal_part = (int)((value - int_part) * 100); // Get two decimal places
+
+    // Handle negative values for correct formatting
+    if (decimal_part < 0) decimal_part = -decimal_part;
+
+    // Prepare the string representation
+    char buffer[20];
+    sprintf(buffer, "%d.%02d", int_part, decimal_part); // Format as "X.XX"
+    UART_puts(buffer); // Send the string over UART
+}
+
+// Print an integer over UART 
+void UART_putint(uint32_t num) {
+    char buffer[10];
+    itoa(num, buffer, 10);  // Convert integer to string 
+    UART_puts(buffer);      // Send string 
+}
+// UART Ends Here. Delete later.
 
