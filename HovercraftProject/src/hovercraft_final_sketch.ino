@@ -41,7 +41,7 @@ extern "C" {
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define fabs(x) ((x)>=0?(x):-(x))
 
-/ IMU data
+// IMU data
 int16_t gx_raw, gy_raw, gz_raw;
 int16_t ax_raw, ay_raw, az_raw;
 float gyro_z;                   // Gyroscope Z-axis data in degrees/second
@@ -101,8 +101,6 @@ bool isGoalDetected();      //DONE
 bool isObstacleDetected();  //DONE
 void setup();
 void handleState();
-void scanEnvironment();
-bool isObstacleDetected();
 long measureUltrasonicDistance();
 
 //OLD SERVO write FN
@@ -120,12 +118,12 @@ void SCL_LOW();
 uint8_t SDA_READ();
 void UART_init(unsigned int baudrate);
 void UART_transmit(unsigned char data);
-void UART_print(const char* str);
-void UART_println(const char* str);
-void UART_printFloat(float number, int decimalPlaces);
+void UART_puts(const char* str);
+void UART_puts(const char* str);
+void UART_putfloat(float number);
 void delay_ms(unsigned int ms); //OLD SERVO FN? DOES IMU USE?
 void delay_us(unsigned int us); //OLD SERVO FN? DOES IMU USE?
-unsigned long customMillis(); //OLD SERVO FN? DOES IMU USE?
+unsigned long millis2(); //OLD SERVO FN? DOES IMU USE?
 
 ISR(TIMER0_COMPA_vect) {
   timer_millis++; // Increment the millisecond counter
@@ -165,7 +163,7 @@ void setup(){
     TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
 
   // Setup UART for serial communication
-    UART_init(9600);
+    UART_init();
 
     // Setup I2C
     I2C_init();
@@ -174,12 +172,11 @@ void setup(){
    pwm_init(); // Initialize PWM
  _delay_ms(200);
   sei(); // Enable global interrupts
-  previous_time = customMillis();
-  UART_println("Calibration complete.");
-  servo_write((uint16_t)servo_angle); //OLD SERVO
+  previous_time = millis2();
+  UART_puts("Calibration complete.");
   _delay_ms(4000);  // Allow sensor to stabilize
 
-  UART_println("Calibration complete.");
+  UART_puts("Calibration complete.");
 
     // Initialize MPU6050
     MPU6050_init();
@@ -205,12 +202,12 @@ void setup(){
 
     sei(); // Enable global interrupts
 
-    previous_time = customMillis();
+    previous_time = millis2();
 
 }
 
 int main() {
-
+  setup();
     while (1) {
         handleState();
     }
@@ -221,7 +218,7 @@ void handleState() {
     case INIT:  //DONE
       //Set up sensors and actuators (IMU, fans, servo, IR, ultrasonic sensor).
       while(initStatus == FAILURE){
-        setupSystem();
+        setup();
       if(initStatus == SUCCESS){
         currentState = IDLE;
       }
@@ -291,18 +288,13 @@ void stopHoverFan() {
 void startPropulsionFan(uint8_t dutyCycle) {
     static uint8_t timerInitialized = 0;
     if (!timerInitialized) {
-        // Configure Timer 0 for Fast PWM, 8-bit mode
-        TCCR0A |= (1 << WGM00);       // Fast PWM, 8-bit
-        TCCR0A |= (1 << WGM01);       // Fast PWM, part 2
-        TCCR0A |= (1 << COM0A1); // Non-inverting mode on 0C0A (PD6)
-        TCCR0A |= (1 << COM0B1); 
-  
-        TCCR0B |= (1 << WGM02);  
-        TCCR0B |= (1 << CS01) | (1 << CS00); // Prescaler 64 (PWM ~490 Hz)
-
-        timerInitialized = 1; // Mark Timer 0 as initialized
+        // Configure Timer2 for Fast PWM, 8-bit mode
+        TCCR2A |= (1 << WGM20) | (1 << WGM21);   // Fast PWM
+        TCCR2A |= (1 << COM2A1);                // Non-inverting mode on OC2A
+        TCCR2B |= (1 << CS21) | (1 << CS20);    // Prescaler 64 (~490 Hz)
+        timerInitialized = 1;
     }
-    OCR0A = dutyCycle; // Set duty cycle for propulsion fan (0-255)
+    OCR2A = dutyCycle; // Set duty cycle (0-255)
 }
 //DONE
 void stopPropulsionFan() {
@@ -320,21 +312,14 @@ bool isObstacleDetected() {
   return distance < DISTANCE_THRESHOLD;
 }
 void delay_ms(unsigned int ms) {
-    unsigned long start = customMillis();
-    while (customMillis() - start < ms);
+    unsigned long start = millis2();
+    while (millis2() - start < ms);
 }
 
 void delay_us(unsigned int us) {
     while (us--) {
         _delay_us(1); // Use built-in function for accuracy
     }
-}
-unsigned long customMillis() {
-    unsigned long ms;
-    cli();
-    ms = milliseconds;
-    sei();
-    return ms;
 }
 //servo write
 //DONE
@@ -516,7 +501,7 @@ void calculateAngles() {
     pitch = atan2(-Ax_cal, sqrt(Ay_cal * Ay_cal + Az_cal * Az_cal)) * 180.0 / M_PI;
 
     // Time difference
-    unsigned long current_time = customMillis();
+    unsigned long current_time = millis2();
     delta_t = (current_time - previous_time) / 1000.0; // Convert ms to s
     previous_time = current_time;
 
@@ -536,15 +521,6 @@ void calculateAngles() {
 }
 
 //to change 
-void controlYawLED() {
-    // Check if the yaw angle is outside of ±85 degrees
-    if (yaw >= MAX_YAW || yaw <= MIN_YAW) {
-        PORTB |= (1 << LED_L_PIN);  // Turn on LED "L"
-    } else {
-        PORTB &= ~(1 << LED_L_PIN); // Turn off LED "L"
-    }
-}
-
 void controlAccelerationLED() {
     // Use the led acceleration value
     float absAccelX = fabs(accelX_filtered); // Use fabs for floating-point absolute value
@@ -598,17 +574,6 @@ void measureDistance() {
     previous_velocity = current_velocity;
 }
 
-void setupPWM() {
-    // Set LED D3 pin as output
-    DDRB |= (1 << LED_D3_PIN);
-
-    // Setup Timer2 for Fast PWM mode
-    TCCR2A = (1 << WGM21) | (1 << WGM20) | (1 << COM2A1); // Fast PWM, non-inverting
-    TCCR2B = (1 << CS21); // Prescaler 8
-    OCR2A = 0; // Initial duty cycle
-}
-
-
 // Initialize PWM for servo control and D3
 void pwm_init() {
     DDRB |= (1 << PORTB1); // Set PB1 as output
@@ -642,6 +607,24 @@ void update_servo(const char* direction) {
   // Set the PWM value for the servo motor
   OCR1A = servo_index;  // Update PWM for the servo motor
 }
+void update_servo_angle(int16_t angle) {
+  uint16_t servo_index;
+
+  // Map the input angle (-90 to 90) to the servo range (85 to 253)
+  if (angle < -90) angle = -90; // Clamp the angle to -90
+  if (angle > 90) angle = 90;   // Clamp the angle to 90
+
+  // Map the angle to the servo range
+  servo_index = map(angle, -90, 90, 85, 253);
+
+  // Ensure the servo position is within valid range
+  if (servo_index < 85) servo_index = 85;
+  if (servo_index > 253) servo_index = 253;
+
+  // Set the PWM value for the servo motor
+  OCR1A = servo_index;  // Update PWM for the servo motor
+}
+
 // Initialization of the UART for serial communication
 void UART_init() {
     // Set baud rate
@@ -685,5 +668,34 @@ void UART_putint(uint32_t num) {
     itoa(num, buffer, 10);  // Convert integer to string 
     UART_puts(buffer);      // Send string 
 }
-// UART Ends Here. Delete later.
+void scanEnvironment() {
 
+  float maxDistance = -1;
+  float chosenAngle = 0;
+  // Rotate servo to scan surroundings
+  for (int angle = 0; angle <= 180; angle += 15) {
+    update_servo_angle((int16_t)angle);
+    _delay_ms(100);  // Allow sensor to stabilize
+
+    // Evaluate distance using ultrasonic sensor
+    float distance = measureUltrasonicDistance();
+
+    //output for testing
+    UART_puts("Distance at ");
+    UART_putfloat(distance);
+    UART_puts(" cm");
+
+    // need dont want to lock onto the wall nearby
+    if (distance > 25 && distance > maxDistance) {
+      maxDistance = distance;
+      chosenAngle = (float)angle;
+    }
+  }
+  //write the angle with the greatest distance
+  update_servo_angle((int16_t)chosenAngle);
+
+  //output for testing
+  UART_puts("Angle at ");
+  UART_putfloat(chosenAngle);
+  UART_puts(" degrees");
+}
