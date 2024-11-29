@@ -78,19 +78,19 @@ void delay_ms(unsigned int ms); //OLD SERVO FN? DOES IMU USE?
 void delay_us(unsigned int us); //OLD SERVO FN? DOES IMU USE?
 unsigned long customMillis(); //OLD SERVO FN? DOES IMU USE?
 
-/*ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU REMOVE
+ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU REMOVE
     milliseconds++;
-}*/
+}
 
 void setup(){
   cli(); // Disable global interrupts
   
- /* // Setup Timer1 for millisecond timing
+ // Setup Timer1 for millisecond timing
     TCCR1A = (1 << WGM11); // CTC mode
     OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
     TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
-  */
+  
   // Initialize pins
   DDRD |= (1 << HOVER_FAN_PIN) | (1 << PROPULSION_FAN_PIN); // Set PD4 and PD6 as outputs
   DDRB |= (1 << TRIG_PIN);  // TRIG_PIN output
@@ -100,13 +100,13 @@ void setup(){
 
   /*//timer 2
   TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
-  TCCR2B |= (1 << CS22);
+  TCCR2B |= (1 << CS22);*/
 
    // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
     OCR0A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK0 = (1 << OCIE0A); // Enable Timer0 compare match interrupt
-    TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64*/
+    TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
 
   // Setup UART for serial communication
     UART_init(9600);
