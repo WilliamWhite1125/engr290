@@ -7,7 +7,7 @@
 #define PROPULSION_FAN_PIN PD6   // Propulsion fan (Fan 2) - PWM (0C0A)
 #define TRIG_PIN PB3
 #define ECHO_PIN PD2
-#define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5)
+#define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5) // MAYBE CHANGE TO PB1???
 #define SDA_PIN PC4               // SDA connected to PC4 (Arduino A4)
 #define SCL_PIN PC5               // SCL connected to PC5 (Arduino A5)
 #define IR_PIN PC0  
@@ -57,8 +57,8 @@ void handleState();
 void scanEnvironment();
 bool isObstacleDetected();
 long measureUltrasonicDistance();
-void servo_write(uint16_t angle);
-void setupPWM();
+void servo_write(uint16_t angle); //OLD SERVO FN
+void setupPWM(); //OLD SERVO FN
 void I2C_init();
 void I2C_start();
 void I2C_stop();
@@ -74,11 +74,11 @@ void UART_transmit(unsigned char data);
 void UART_print(const char* str);
 void UART_println(const char* str);
 void UART_printFloat(float number, int decimalPlaces);
-void delay_ms(unsigned int ms);
-void delay_us(unsigned int us);
-unsigned long customMillis();
+void delay_ms(unsigned int ms); //OLD SERVO FN? DOES IMU USE?
+void delay_us(unsigned int us); //OLD SERVO FN? DOES IMU USE?
+unsigned long customMillis(); //OLD SERVO FN? DOES IMU USE?
 
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU REMOVE
     milliseconds++;
 }
 
@@ -115,7 +115,7 @@ void setup(){
     I2C_init();
 
   //start servo in the middle
-  servo_write((uint16_t)servo_angle);
+  servo_write((uint16_t)servo_angle); //OLD SERVO
   _delay_ms(4000);  // Allow sensor to stabilize
 
   //imu setup code here
