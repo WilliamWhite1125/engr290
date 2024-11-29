@@ -1,6 +1,8 @@
 #include <util/delay.h>
 #include <avr/io.h>
 
+#define F_CPU 16000000UL         // Clock speed
+
 #define TRIG_PIN PB3
 #define ECHO_PIN PD2
 #define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5)
