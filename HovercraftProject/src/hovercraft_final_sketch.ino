@@ -1,5 +1,12 @@
+extern "C" {
+    #include "init_290.h"
+    #include "TWI_290.h"  // Include TWI library for I2C communication
+}
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdlib.h>
+#include <math.h>
+#include <stdio.h>
 
 // Pin Definitions
 #define LED_PIN PB5            // Onboard LED
@@ -13,15 +20,14 @@
 #define IR_PIN PC0  
 
 // Constants
-#define F_CPU 16000000UL         // Clock speed
+#define F_CPU 16000000UL // CPU frequency
+#define BAUD 9600 // Desired baud rate
+#define MYUBRR F_CPU/16/BAUD-1 // UBRR calculation
 
 #define IMU_ADDRESS 0x68          // MPU-6050 I2C address
 #define I2C_DELAY_US 5            // I2C communication delay in microseconds
 #define MIN_YAW -85               // Minimum yaw angle
 #define MAX_YAW 85               // Maximum yaw angle
-
-// Minimum servo angle
-// Maximum servo angle
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
@@ -37,7 +43,7 @@ enum Status{SUCCESS, FAILURE}; //could use this to check if the setup is complet
 Status initStatus=FAILURE;
 
 //global variables
-volatile unsigned long milliseconds = 0; // Millisecond counter for timing
+volatile unsigned long timer_millis;
 unsigned long lastOutputTime = 0;
 unsigned long previous_time = 0;
 // Initialize to middle position
@@ -78,59 +84,56 @@ void delay_ms(unsigned int ms); //OLD SERVO FN? DOES IMU USE?
 void delay_us(unsigned int us); //OLD SERVO FN? DOES IMU USE?
 unsigned long customMillis(); //OLD SERVO FN? DOES IMU USE?
 
-ISR(TIMER1_COMPA_vect) { //USED BY DELAY AND TIMER FNS ^^ IF NOT NEEDED FOR IMU REMOVE
-    milliseconds++;
+ISR(TIMER0_COMPA_vect) {
+  timer_millis++; // Increment the millisecond counter
 }
-
+unsigned long millis2() {
+  return timer_millis; // Return the current millisecond count
+}
+void setup_timer() {
+    TCCR0A |= (1 << WGM01); // Set Timer0 to CTC mode
+    TCCR0B |= (1 << CS01);  // Set prescaler to 8
+    OCR0A = 199;            // Set compare value for 1 ms
+    TIMSK0 |= (1 << OCIE0A);// Enable compare interrupt
+    sei();                  // Enable global interrupts
+}
 void setup(){
   cli(); // Disable global interrupts
-  
+     setup_timer();
+     UART_puts("System Initializing...\r\n");
+  _delay_ms(200);
  // Setup Timer1 for millisecond timing
     TCCR1A = (1 << WGM11); // CTC mode
     OCR1A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK1 = (1 << OCIE1A); // Enable Timer0 compare match interrupt
     TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
-  
   // Initialize pins
   DDRD |= (1 << HOVER_FAN_PIN) | (1 << PROPULSION_FAN_PIN); // Set PD4 and PD6 as outputs
   DDRB |= (1 << TRIG_PIN);  // TRIG_PIN output
   DDRD &= ~(1 << ECHO_PIN); // ECHO_PIN input
   DDRC &= ~(1 << IR_PIN); //ir pin input
   DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
-
-  /*//timer 2
-  TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
-  TCCR2B |= (1 << CS22);*/
-
    // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
     OCR0A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK0 = (1 << OCIE0A); // Enable Timer0 compare match interrupt
     TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
-
   // Setup UART for serial communication
     UART_init(9600);
-
     // Setup I2C
     I2C_init();
-
   //start servo in the middle
-  //OLD SERVO
-  _delay_ms(4000);  // Allow sensor to stabilize
-
-  //imu setup code here
-
+ pwm_init(); // Initialize PWM
+ _delay_ms(200);
   sei(); // Enable global interrupts
-
   previous_time = customMillis();
-
   UART_println("Calibration complete.");
 }
 
 int main() {
 
     while (1) {
-        //main code
+        handleState();
     }
 }
 void handleState() {
@@ -286,4 +289,37 @@ float measureIRDistance() {
   	float distance = 75/(voltage-1.25);
 
     return distance;
+}
+// Initialize PWM for servo control and D3
+void pwm_init() {
+    DDRB |= (1 << PORTB1); // Set PB1 as output
+    TCCR1A  |= (1 << COM1A1) | (1 << COM1B1); // non-inv PWM on channels A and B
+    TCCR1B |= (1 << WGM13); // Phase and Frequency Correct PWM
+    ICR1 = 39999; // Set TOP value for 50Hz PWM (for servo control)
+    TCCR1B |= ((1 << CS11) | (1 << CS10)); // Prescaler 8, starts PWM
+}
+void update_servo(const char* direction) {
+  uint16_t servo_index;
+
+  // Check the string input and set the servo position based on direction
+  if (strcmp(direction, "straight") == 0) {
+    // Servo points straight
+    servo_index = 185;  
+  } else if (strcmp(direction, "left") == 0) {
+    // Servo points left for a left turn
+    servo_index = 253;  
+  } else if (strcmp(direction, "right") == 0) {
+    // Servo points right for a right turn
+    servo_index = 85;  
+  } else {
+    // Default behavior if the direction is not recognized
+    servo_index = 169.5;  // Set to straight if invalid input
+  }
+
+  // Ensure the servo position is within valid range
+  if (servo_index < 85) servo_index = 85;
+  if (servo_index > 253) servo_index = 253;
+
+  // Set the PWM value for the servo motor
+  OCR1A = servo_index;  // Update PWM for the servo motor
 }
