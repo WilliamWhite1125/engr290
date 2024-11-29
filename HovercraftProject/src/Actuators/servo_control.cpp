@@ -13,6 +13,8 @@ extern "C" {
 #define BAUD 9600 // Desired baud rate
 #define MYUBRR F_CPU/16/BAUD-1 // UBRR calculation
 
+volatile unsigned long timer_millis;
+
 // Initialize PWM for servo control and D3
 void pwm_init() {
     DDRB |= (1 << PORTB1); // Set PB1 as output
@@ -63,8 +65,6 @@ void update_servo(const char* direction) {
   OCR1A = servo_index;  // Update PWM for the servo motor
 }
 void setup() {
-  UART_init(); // Initialize UART
-  ultrasonic_init();  // Initialize US pins and interrupts
   setup_timer();
   UART_puts("System Initializing...\r\n");
   _delay_ms(200);
