@@ -15,8 +15,8 @@
 // Constants
 #define F_CPU 16000000UL         // Clock speed
 
-#define IMU_ADDRESS 0x68          // MPU-6050 I2C address
-#define I2C_DELAY_US 5            // I2C communication delay in microseconds
+#define IMU_ADDRESS 0x68          // MPU-6050 C address
+#define C_DELAY_US 5            // I2C communication delay in microseconds
 #define MIN_YAW -85               // Minimum yaw angle
 #define MAX_YAW 85               // Maximum yaw angle
 
@@ -29,6 +29,39 @@
 #define GOAL_LOW 20  // Adjust based on IR sensor data
 #define GOAL_HIGH 50  // Adjust based on IR sensor data
 #define DISTANCE_THRESHOLD 30  //cm //adjust based on testing results
+
+// Function-like macros
+#define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
+#define fabs(x) ((x)>=0?(x):-(x))
+
+/ IMU data
+int16_t gx_raw, gy_raw, gz_raw;
+int16_t ax_raw, ay_raw, az_raw;
+float gyro_z;                   // Gyroscope Z-axis data in degrees/second
+float yaw = 0;                  // Yaw angle in degrees
+float roll = 0.0, pitch = 0.0;  // Calculated roll and pitch angles
+float delta_t;
+
+// Calibrated accelerometer values
+float Ax_cal, Ay_cal, Az_cal;
+
+// Distance measurement variables
+float distance_traveled = 0;    // Total distance traveled in X-axis (meters)
+float previous_velocity = 0;    // Previous velocity along X-axis (m/s)
+
+// Gyroscope and accelerometer biases
+float gz_bias = 0.0;            // Gyroscope Z-axis bias
+float ax_bias = 0.0;
+float ay_bias = 0.0;
+float az_bias = 0.0;
+
+// For filtering
+float accelX_filtered = 0.0;
+float accelX_high_pass = 0.0;
+float accelX_prev = 0.0;
+float alpha_hp = 0.98; // High-pass filter coefficient
+
+float alpha_lp = 0.2; // Low-pass filter coefficient for acceleration
 
 // Define states
 enum State { INIT, IDLE, SCAN, MOVE, GOAL, STOP };
@@ -43,6 +76,13 @@ unsigned long previous_time = 0;
 float servo_angle = 90.0; // Initialize to middle position
 
 // Function Prototypes
+void MPU6050_init();
+void readMPU6050();
+void calculateAngles();
+void measureDistance();
+void controlAccelerationLED();
+void controlYawLED();
+void setupPWM(); //old servo, but good imu (to fix)
 void startHoverFan();
 void stopHoverFan();
 void startPropulsionFan(uint8_t dutyCycle);
@@ -58,7 +98,6 @@ void scanEnvironment();
 bool isObstacleDetected();
 long measureUltrasonicDistance();
 void servo_write(uint16_t angle); //OLD SERVO FN
-void setupPWM(); //OLD SERVO FN
 void I2C_init();
 void I2C_start();
 void I2C_stop();
@@ -102,14 +141,13 @@ void setup(){
   TCCR2A |= (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  
   TCCR2B |= (1 << CS22);
 
-   // Setup Timer0 for millisecond timing
+    // Setup Timer0 for millisecond timing
     TCCR0A = (1 << WGM01); // CTC mode
     OCR0A = 249;           // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK0 = (1 << OCIE0A); // Enable Timer0 compare match interrupt
     TCCR0B = (1 << CS01) | (1 << CS00); // Prescaler 64
 
-  // Setup UART for serial communication
-    UART_init(9600);
+    Serial.begin(9600);
 
     // Setup I2C
     I2C_init();
@@ -118,13 +156,37 @@ void setup(){
   servo_write((uint16_t)servo_angle); //OLD SERVO
   _delay_ms(4000);  // Allow sensor to stabilize
 
-  //imu setup code here
-
-  sei(); // Enable global interrupts
-
-  previous_time = customMillis();
-
   UART_println("Calibration complete.");
+
+
+    // Initialize PWM for LED D3 brightness control
+    setupPWM();
+
+    // Initialize MPU6050
+    MPU6050_init();
+
+    // Calibrate gyroscope and accelerometer biases
+    int num_samples = 2000; // Increased number of samples for better accuracy
+    long gz_sum = 0;
+    long ax_sum = 0, ay_sum = 0, az_sum = 0;
+
+    
+    for (int i = 0; i < num_samples; i++) {
+        readMPU6050();
+        gz_sum += gz_raw;
+        ax_sum += ax_raw;
+        ay_sum += ay_raw;
+        az_sum += az_raw;
+        delay_ms(1);
+    }
+    gz_bias = (float)gz_sum / num_samples;
+    ax_bias = ((float)ax_sum / num_samples) / ACCEL_SCALE;
+    ay_bias = ((float)ay_sum / num_samples) / ACCEL_SCALE;
+    az_bias = ((float)az_sum / num_samples) / ACCEL_SCALE - 1.0; // Assuming gravity on Z-axis
+
+    sei(); // Enable global interrupts
+
+    previous_time = customMillis();
 }
 
 int main() {
@@ -307,3 +369,241 @@ float measureIRDistance() {
 
     return distance;
 }
+
+void I2C_init() {
+    PORTC |= (1 << PC4) | (1 << PC5); // Enable pull-up resistors on SDA and SCL
+}
+
+void I2C_start() {
+    SDA_HIGH();
+    SCL_HIGH();
+    delay_us(I2C_DELAY_US);
+    SDA_LOW();
+    delay_us(I2C_DELAY_US);
+    SCL_LOW();
+}
+
+void I2C_stop() {
+    SDA_LOW();
+    delay_us(I2C_DELAY_US);
+    SCL_HIGH();
+    delay_us(I2C_DELAY_US);
+    SDA_HIGH();
+    delay_us(I2C_DELAY_US);
+}
+
+uint8_t I2C_write_byte(uint8_t data) {
+    for (uint8_t i = 0; i < 8; i++) {
+        if (data & 0x80) {
+            SDA_HIGH();
+        } else {
+            SDA_LOW();
+        }
+        data <<= 1;
+        SCL_HIGH();
+        delay_us(I2C_DELAY_US);
+        SCL_LOW();
+        delay_us(I2C_DELAY_US);
+    }
+    // ACK/NACK
+    SDA_HIGH(); // Release SDA
+    SCL_HIGH();
+    delay_us(I2C_DELAY_US);
+    uint8_t ack = !(SDA_READ());
+    SCL_LOW();
+    return ack;
+}
+
+uint8_t I2C_read_byte(uint8_t ack) {
+    uint8_t data = 0;
+    SDA_HIGH(); // Release SDA
+    for (uint8_t i = 0; i < 8; i++) {
+        data <<= 1;
+        SCL_HIGH();
+        delay_us(I2C_DELAY_US);
+        if (SDA_READ()) {
+            data |= 1;
+        }
+        SCL_LOW();
+        delay_us(I2C_DELAY_US);
+    }
+    // Send ACK/NACK
+    if (ack) {
+        SDA_LOW(); // ACK
+    } else {
+        SDA_HIGH(); // NACK
+    }
+    SCL_HIGH();
+    delay_us(I2C_DELAY_US);
+    SCL_LOW();
+    return data;
+}
+
+void SDA_HIGH() {
+    PORTC |= (1 << PC4);
+    DDRC &= ~(1 << PC4); // Input mode
+}
+
+void SDA_LOW() {
+    DDRC |= (1 << PC4);  // Output mode
+    PORTC &= ~(1 << PC4); // Low
+}
+
+void SCL_HIGH() {
+    PORTC |= (1 << PC5);
+    DDRC &= ~(1 << PC5); // Input mode
+}
+
+void SCL_LOW() {
+    DDRC |= (1 << PC5);  // Output mode
+    PORTC &= ~(1 << PC5); // Low
+}
+
+uint8_t SDA_READ() {
+    return (PINC & (1 << PC4)) != 0;
+}
+
+void MPU6050_init() {
+    I2C_start();
+    I2C_write_byte(IMU_ADDRESS << 1); // Write address
+    I2C_write_byte(0x6B);             // Power management register
+    I2C_write_byte(0x00);             // Wake up the MPU6050
+    I2C_stop();
+
+    // Set accelerometer configuration (full scale ±2g)
+    I2C_start();
+    I2C_write_byte(IMU_ADDRESS << 1);
+    I2C_write_byte(0x1C); // Accelerometer config register
+    I2C_write_byte(0x00); // ±2g
+    I2C_stop();
+
+    // Set gyroscope configuration (full scale ±250°/s)
+    I2C_start();
+    I2C_write_byte(IMU_ADDRESS << 1);
+    I2C_write_byte(0x1B); // Gyroscope config register
+    I2C_write_byte(0x00); // ±250°/s
+    I2C_stop();
+}
+
+void readMPU6050() {
+    I2C_start();
+    I2C_write_byte(IMU_ADDRESS << 1); // Write address
+    I2C_write_byte(0x3B);             // Starting register for accelerometer data
+    I2C_stop();
+
+    I2C_start();
+    I2C_write_byte((IMU_ADDRESS << 1) | 1); // Read address
+
+    ax_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
+    ay_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
+    az_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
+    I2C_read_byte(1); I2C_read_byte(1); // Skip temperature
+    gx_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
+    gy_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
+    gz_raw = (I2C_read_byte(0) << 8) | I2C_read_byte(0); // Last byte NACK
+
+    I2C_stop();
+}
+
+void calculateAngles() {
+    // Calibrate accelerometer readings
+    Ax_cal = ((float)ax_raw / ACCEL_SCALE) - ax_bias;
+    Ay_cal = ((float)ay_raw / ACCEL_SCALE) - ay_bias;
+    Az_cal = ((float)az_raw / ACCEL_SCALE) - az_bias;
+
+    roll = atan2(Ay_cal, Az_cal) * 180.0 / M_PI;
+    pitch = atan2(-Ax_cal, sqrt(Ay_cal * Ay_cal + Az_cal * Az_cal)) * 180.0 / M_PI;
+
+    // Time difference
+    unsigned long current_time = customMillis();
+    delta_t = (current_time - previous_time) / 1000.0; // Convert ms to s
+    previous_time = current_time;
+
+    // Gyroscope readings
+    float Gz = ((float)gz_raw - gz_bias) / GYRO_SENSITIVITY;
+
+    // Update yaw
+    yaw += Gz * delta_t;
+
+    // Constrain yaw angle within ±180 degrees
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
+
+    // Constrain yaw within ±85 degrees (optional)
+    if (yaw > MAX_YAW) yaw = MAX_YAW;
+    if (yaw < MIN_YAW) yaw = MIN_YAW;
+}
+
+//to change 
+void controlYawLED() {
+    // Check if the yaw angle is outside of ±85 degrees
+    if (yaw >= MAX_YAW || yaw <= MIN_YAW) {
+        PORTB |= (1 << LED_L_PIN);  // Turn on LED "L"
+    } else {
+        PORTB &= ~(1 << LED_L_PIN); // Turn off LED "L"
+    }
+}
+
+void controlAccelerationLED() {
+    // Use the led acceleration value
+    float absAccelX = fabs(accelX_filtered); // Use fabs for floating-point absolute value
+
+    uint16_t brightness = 0;
+
+    // Define thresholds
+    const float minAccel = 0.08;
+    const float maxAccel = 1.08;
+
+    if (absAccelX <= minAccel) {
+        brightness = 0; // LED off
+    } else if (absAccelX >= maxAccel) {
+        brightness = 255; // Maximum brightness
+    } else {
+        // Map acceleration to brightness linearly
+        brightness = (uint16_t)(((absAccelX - minAccel) / (maxAccel - minAccel)) * 255.0);
+    }
+
+    // Set PWM duty cycle
+    OCR2A = (uint8_t)brightness;
+}
+
+void measureDistance() {
+    // Use the calibrated accelerometer value
+    float accelX_g = Ax_cal;
+
+    // Apply low-pass filter to acceleration data
+    accelX_filtered = alpha_lp * accelX_g + (1 - alpha_lp) * accelX_filtered;
+
+    // Apply high-pass filter to remove bias and drift
+    accelX_high_pass = alpha_hp * (accelX_high_pass + accelX_filtered - accelX_prev);
+    accelX_prev = accelX_filtered;
+
+    // Implement dynamic thresholding based on noise standard deviation
+    float noise_threshold = 0.05; // Adjust this value based on observed noise
+    if (fabs(accelX_high_pass) < noise_threshold) {
+        accelX_high_pass = 0.0;
+    }
+
+    float accelX_m_s2 = accelX_high_pass * 9.80665;
+
+    // Integrate acceleration to get velocity and distance using trapezoidal rule
+    float current_velocity = previous_velocity + accelX_m_s2 * delta_t;
+
+    // Apply damping to reduce drift
+    float damping_factor = 0.99;
+    current_velocity *= damping_factor;
+
+    distance_traveled += ((previous_velocity + current_velocity) / 2.0) * delta_t;
+    previous_velocity = current_velocity;
+}
+
+void setupPWM() {
+    // Set LED D3 pin as output
+    DDRB |= (1 << LED_D3_PIN);
+
+    // Setup Timer2 for Fast PWM mode
+    TCCR2A = (1 << WGM21) | (1 << WGM20) | (1 << COM2A1); // Fast PWM, non-inverting
+    TCCR2B = (1 << CS21); // Prescaler 8
+    OCR2A = 0; // Initial duty cycle
+}
+
