@@ -56,10 +56,10 @@ int main() {
     _delay_ms(1000);  // Allow sensor to stabilize
 
      //output for testing
-    Serial.println("Distance at ");
-    Serial.println(angle);
-    Serial.println("* degrees is ");
-    Serial.println(distance);
+    Serial.print("Distance at ");
+    Serial.print(angle);
+    Serial.print("* degrees is ");
+    Serial.print(distance);
     Serial.println(" cm");
     }
     return 0; // Not reached
