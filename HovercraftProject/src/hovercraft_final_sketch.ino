@@ -31,6 +31,7 @@ extern "C" {
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
+#define I2C_DELAY_US 5  // I2C communication delay in microseconds
 
 #define GOAL_LOW 20  // Adjust based on IR sensor data
 #define GOAL_HIGH 50  // Adjust based on IR sensor data
