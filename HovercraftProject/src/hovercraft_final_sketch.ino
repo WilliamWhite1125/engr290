@@ -195,6 +195,7 @@ void handleState() {
       break;
   }
 }
+//DONE
 // Hover Fan (PD4) Control
 void startHoverFan() {
     PORTD |= (1 << HOVER_FAN_PIN); // Set PD4 high to turn on hover fan
@@ -203,7 +204,7 @@ void startHoverFan() {
 void stopHoverFan() {
     PORTD &= ~(1 << HOVER_FAN_PIN); // Set PD4 low to turn off hover fan
 }
-
+//DONE
 // Propulsion Fan (PD6) Control Using Timer 1
 void startPropulsionFan(uint8_t dutyCycle) {
     static uint8_t timerInitialized = 0;
@@ -221,7 +222,7 @@ void startPropulsionFan(uint8_t dutyCycle) {
     }
     OCR0A = dutyCycle; // Set duty cycle for propulsion fan (0-255)
 }
-
+//DONE
 void stopPropulsionFan() {
     OCR0A = 0; // Set duty cycle to 0 to stop propulsion fan
 }
@@ -274,6 +275,7 @@ void servo_write(uint16_t angle) {
         delay_ms(20 - pulse_duration_ms);
     }
 }
+//DONE
 long measureUltrasonicDistance() {
     long duration; 
     int distance;  
@@ -290,6 +292,7 @@ long measureUltrasonicDistance() {
 
     return distance; 
 }
+//DONE
 float measureIRDistance() {
     ADMUX = (1 << REFS0) | (IR_PIN & 0x0F); 
     ADCSRA |= (1 << ADSC);  
