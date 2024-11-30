@@ -16,9 +16,9 @@
 #define MIN_SERVO_ANGLE 0         // Minimum servo angle
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
 
-#define LED_L_PIN PB5             // LED "L" pin (Arduino pin 13)
+#define LED_L_PIN PB5           // LED "L" pin (Arduino pin 13)
 #define LED_D3_PIN PB3            // LED D3 pin (OC2A, Arduino pin 11)
-#define SERVO_PIN PD5             // Servo motor control pin (Arduino pin 5)
+#define SERVO_PIN PB1            // Servo motor control pin
 
 #define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
 #define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
@@ -118,7 +118,7 @@ void setup() {
     // Setup Servo pin
     DDRD |= (1 << PD5); // Set PD5 (Arduino pin 5) as output for servo control
 
-    // Initialize PWM for LED D3 brightness control
+    // Initialize PWM for SERVO CONTROL
     setupPWM();
 
     // Initialize MPU6050
@@ -380,25 +380,17 @@ void calculateAngles() {
 }
 
 void servo_write(uint16_t angle) {
-    // Constrain the angle within 0 to 180 degrees
-    angle = constrain(angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-
-    // Convert angle to pulse width (1 ms to 2 ms)
-    uint16_t pulse_width_us = ((angle * 1000UL) / 180UL) + 1000UL; // 1000us to 2000us
-
-    // Generate the servo pulse
-    // Start of pulse
-    PORTD |= (1 << PD5);
-    delay_us(pulse_width_us); // Keep pin high for the duration of the pulse
-
-    // End of pulse
-    PORTD &= ~(1 << PD5);
-
-    // Wait for the remainder of the 20 ms period
-    unsigned long pulse_duration_ms = pulse_width_us / 1000;
-    if (pulse_duration_ms < 20) {
-        delay_ms(20 - pulse_duration_ms);
-    }
+    // Constrain angle to 0-180
+    angle = constrain(angle, 0, 180);
+    
+    // Convert angle to pulse width (900-2100 microseconds)
+    // 900µs = 1800 timer ticks, 2100µs = 4200 timer ticks
+    uint16_t pulse_width = 1000 + ((4000 * (uint32_t)angle) / 180);
+    pulse_width = constrain(pulse_width, 1000, 5000);
+    
+    
+    // Update PWM compare value
+    OCR1A = pulse_width;
 }
 
 void controlYawLED() {
@@ -464,13 +456,16 @@ void measureDistance() {
 }
 
 void setupPWM() {
-    // Set LED D3 pin as output
-    DDRB |= (1 << LED_D3_PIN);
-
-    // Setup Timer2 for Fast PWM mode
-    TCCR2A = (1 << WGM21) | (1 << WGM20) | (1 << COM2A1); // Fast PWM, non-inverting
-    TCCR2B = (1 << CS21); // Prescaler 8
-    OCR2A = 0; // Initial duty cycle
+    // Configure Timer1 for PWM generation
+    // Fast PWM mode with ICR1 as TOP
+    TCCR1A = (1 << COM1A1) | (1 << WGM11);
+    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
+    
+    // Set PWM frequency to 50Hz (20ms period)
+    ICR1 = 39999;  // = 16MHz/(8 * 50Hz) - 1
+    
+    // Initialize servo to middle position
+    OCR1A = 3000;  // ~1.5ms pulse (90 degrees)
 }
 
 void UART_init(unsigned int baudrate) {
