@@ -141,7 +141,7 @@ unsigned long customMillis() {
     return ms;
 }
 
-//Above only servo
+//Above only servo and us
 bool isObstacleDetected(){
 measureUltrasonicDistance();
 if(distance < D1){
