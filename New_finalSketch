@@ -18,7 +18,7 @@
 
 // Global variables
 volatile unsigned long milliseconds = 0; // Millisecond counter for timing
-float servo_angle = 90.0; // Initialize to middle position
+uint16_t servo_angle = 90; // Initialize to middle position
 enum State { INIT, IDLE, SCAN, MOVE };
 State currentState = INIT;
 float currentSpeed = 0;
