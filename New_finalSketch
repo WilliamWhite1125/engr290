@@ -24,10 +24,6 @@ float currentSpeed = 0;
 
 // Function Prototypes
 void setup();
-void handleState();
-void scanEnvironment();
-bool isObstacleDetected();
-long measureUltrasonicDistance();
 void servo_write(uint16_t angle);
 void setupPWM();
 
@@ -76,86 +72,6 @@ int main() {
     return 0; // Not reached
 }
 
-// Measure distance with ultrasonic sensor
-long measureUltrasonicDistance() {
-    long duration;
-    int distance;
-
-    PORTD &= ~(1 << TRIG_PIN); // Set TRIG_PIN LOW
-    _delay_us(2);
-    PORTD |= (1 << TRIG_PIN);  // Set TRIG_PIN HIGH
-    _delay_us(10);
-    PORTD &= ~(1 << TRIG_PIN); // Set TRIG_PIN LOW
-
-    // Measure the duration of the echo
-    duration = pulseIn(ECHO_PIN, HIGH);
-    distance = duration * 0.0344 / 2;
-
-    return distance;
-}
-
-void handleState() {
-    switch (currentState) {
-        case IDLE:
-            Serial.println("CURRENT STATE IDLE");
-            Serial.println("StopFans()");
-            _delay_ms(1000); // Wait for stability
-            currentState = SCAN;
-            break;
-
-        case SCAN:
-            Serial.println("CURRENT STATE SCAN");
-            scanEnvironment();
-            currentState = MOVE;
-            break;
-
-        case MOVE:
-            Serial.println("CURRENT STATE MOVE");
-            Serial.println("startHoverFan()");
-            Serial.println("startPropulsionFan()");
-            _delay_ms(4000); // Simulate movement
-            if (isObstacleDetected()) {
-                Serial.println("Obstacle Detected");
-                currentState = SCAN;
-            }
-            break;
-    }
-}
-
-void scanEnvironment() {
-    float maxDistance = -1;
-    float chosenAngle = 0;
-
-    for (int angle = 0; angle <= 180; angle += 15) {
-        servo_angle = constrain(angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-        servo_write((uint16_t)servo_angle);
-        _delay_ms(100); // Allow sensor to stabilize
-
-        long distance = measureUltrasonicDistance();
-
-        Serial.print("Distance at ");
-        Serial.print(angle);
-        Serial.print("* degrees: ");
-        Serial.print(distance);
-        Serial.println(" cm");
-
-        if (distance > 25 && distance > maxDistance) {
-            maxDistance = distance;
-            chosenAngle = (float)angle;
-        }
-    }
-    chosenAngle = 90;
-    servo_angle = chosenAngle;
-    servo_write((uint16_t)servo_angle);
-
-    Serial.print("Chosen Angle: ");
-    Serial.println(servo_angle);
-}
-
-bool isObstacleDetected() {
-    long distance = measureUltrasonicDistance();
-    return distance < DISTANCE_THRESHOLD;
-}
 
 void servo_write(uint16_t angle) {
     // Constrain angle to 0-180
@@ -209,12 +125,3 @@ unsigned long customMillis() {
     sei();
     return ms;
 }
-
-// Linear map function for unsigned long
-unsigned long linear_map(unsigned long value, unsigned long in_min, unsigned long in_max, unsigned long out_min, unsigned long out_max) {
-    if (in_max == in_min) {
-        // Avoid division by zero
-        fprintf(stderr, "Error: Input range cannot be zero.\n");
-        return 0;
-    }
-    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
