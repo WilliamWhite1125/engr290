@@ -181,7 +181,7 @@ void stopPropulsionFan() {
 
 void handleState(){
   switch(currentState){
-    case INIT://work on it
+    case INIT:
 	setup();
 	currentState=IDLE:
 	break;
