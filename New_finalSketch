@@ -60,17 +60,7 @@ void setup() {
 
 // Main Function
 int main() {
-    setup();
-    while (1) {
-        servo_write(0);
-        _delay_ms(3000);
-        servo_write(90);
-        _delay_ms(3000);
-        servo_write(180);
-        _delay_ms(3000);
 
-    }
-    return 0; // Not reached
 }
 
 void servo_write(uint16_t angle) {
