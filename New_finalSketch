@@ -8,6 +8,7 @@
 #define ECHO_PIN PD2             // Echo pin assigned to Arduino pin 2
 #define SERVO_PIN PB1            // Servo motor control pin (Arduino pin 9)
 
+#define D1 40  // Reference distance for US sensor
 // Servo and Distance Parameters
 #define MIN_SERVO_ANGLE 0         // Minimum servo angle
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
@@ -38,7 +39,7 @@ void setup() {
     OCR1A = 249;                  // 1 ms interrupt at 16 MHz with prescaler 64
     TIMSK1 = (1 << OCIE1A);       // Enable Timer1 compare match interrupt
     TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
-
+    
     Serial.begin(9600);
     Serial.println("CURRENT STATE INIT");
 
@@ -72,7 +73,6 @@ int main() {
     return 0; // Not reached
 }
 
-
 void servo_write(uint16_t angle) {
     // Constrain angle to 0-180
     angle = constrain(angle, 0, 180);
@@ -92,7 +92,22 @@ void servo_write(uint16_t angle) {
     Serial.print(" Pulse width: ");
     Serial.println(pulse_width);
 }
+//US sensor distance function
+long measureUltrasonicDistance() {
+    long duration; 
+    int distance;  
 
+    PORTB &= ~(1 << TRIG_PIN); 
+    _delay_us(2); 
+    PORTB |= (1 << TRIG_PIN); 
+    _delay_us(10); 
+    PORTB &= ~(1 << TRIG_PIN); 
+
+    duration = pulseIn(ECHO_PIN, HIGH); 
+    distance = duration * 0.0344 / 2; 
+
+    return distance; 
+}
 
 void setupPWM() {
     // Configure Timer1 for PWM generation
