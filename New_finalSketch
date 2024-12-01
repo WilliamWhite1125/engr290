@@ -153,20 +153,16 @@ return 0;
 }
 }
 
-void scanEnvironment(){
-while(isObstacleDetected()==1){
-servo_write(servo_angle);
-isObstacleDetected();
-if(servo_angle==90||servo_angle==0){
-servo_angle=servo_angle+90;
-}
-else if(servo_angle==180){
-servo_angle=servo_angle-180;
-}
-}
-else {
-currentState=MOVE;
-}
+void scanEnvironment() {
+    while (isObstacleDetected()) {
+        servo_write(servo_angle);
+        if (servo_angle == 90 || servo_angle == 0) {
+            servo_angle += 90;
+        } else if (servo_angle == 180) {
+            servo_angle -= 180;
+        }
+    }
+    currentState = MOVE;
 }
 
 
