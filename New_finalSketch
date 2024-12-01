@@ -92,6 +92,7 @@ void servo_write(uint16_t angle) {
     Serial.print(" Pulse width: ");
     Serial.println(pulse_width);
 }
+
 //US sensor distance function
 long measureUltrasonicDistance() {
     long duration; 
@@ -143,9 +144,9 @@ unsigned long customMillis() {
 
 //Above only servo and us
 bool isObstacleDetected(){
-measureUltrasonicDistance();
+long distance = measureUltrasonicDistance();
 if(distance < D1){
-return1; //obstacle detected 
+return 1; //obstacle detected 
 }
 else{
 return 0;
@@ -154,13 +155,13 @@ return 0;
 
 void scanEnvironment(){
 while(isObstacleDetected()==1){
-servo_write(angle);
+servo_write(servo_angle);
 isObstacleDetected();
-if(angle==90||angle==0){
-angle=angle+90;
+if(servo_angle==90||servo_angle==0){
+servo_angle=servo_angle+90;
 }
-if(angle==180){
-angle=angle-180;
+else if(servo_angle==180){
+servo_angle=servo_angle-180;
 }
 }
 else {
