@@ -150,7 +150,7 @@ return 1; //obstacle detected
 else{
 return 0;
 }
-}; 
+}
 
 void scanEnvironment(){
 while(1){
@@ -158,14 +158,14 @@ servo_write(angle);
 isObstacleDetected();
 if(angle==90||angle==0){
 angle=angle+90;
-};
+}
 if(angle==180){
 angle=angle-180;
 }
 }
 else {
-return MOVE;
-};
-};
+currentState=MOVE;
+}
+}
 
 
