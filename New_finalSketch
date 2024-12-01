@@ -179,3 +179,33 @@ void stopPropulsionFan() {
     OCR0A = 0; // Set duty cycle to 0 to stop propulsion fan
 }
 
+void handleState(){
+  switch(currentState){
+    case INIT://work on it
+    case IDLE:
+      stopPropulsionFan();
+      stopHoverFan();
+      _delay_ms(1000);
+      currentState=SCAN;
+      break;
+    case SCAN:
+      scanEnvironment();
+      currentState=MOVE;
+    break;
+    case MOVE:
+      startHoverFan();
+      startPropulsionFan(255);
+      _delay_ms(4000);
+
+      while(isObstacleDetected()==1){
+	currentState=SCAN;
+}	if(isGoalDetected()){
+	currentState=STOP;
+} 
+	break;
+    case STOP:
+	stopPropulsionFan();
+	stopHoverFan();
+	break;
+  }
+}
