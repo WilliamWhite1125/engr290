@@ -212,3 +212,7 @@ void handleState(){
 	break;
   }
 }
+void loop(){
+	handleState();
+
+}
