@@ -91,6 +91,19 @@ void setup(void) {
     OCR1A = 39999;  // 50Hz for servo control
     TIMSK1 = (1 << OCIE1A);
 
+    servo_write(90);  // Center the servo
+    _delay_ms(1000);  // Allow everything to stabilize
+    
+    sei(); // Enable global interrupts
+    currentState = IDLE;
+    previous_time = customMillis();
+
+    // Configure Timer1 for PWM generation
+    TCCR1A = (1 << COM1A1) | (1 << WGM11);
+    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
+    ICR1 = 39999;  // 50Hz PWM frequency
+    OCR1A = 3000;  // Initial servo position (90 degrees)
+
     // Pin Setup
     DDRD |= (1 << TRIG_PIN);      // TRIG_PIN output
     DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
@@ -114,19 +127,6 @@ void setup(void) {
         ay_sum += ay_raw;
         az_sum += az_raw;
         _delay_ms(1);
-
-    servo_write(90);  // Center the servo
-    _delay_ms(1000);  // Allow everything to stabilize
-    
-    sei(); // Enable global interrupts
-    currentState = IDLE;
-    previous_time = customMillis();
-
-    // Configure Timer1 for PWM generation
-    TCCR1A = (1 << COM1A1) | (1 << WGM11);
-    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
-    ICR1 = 39999;  // 50Hz PWM frequency
-    OCR1A = 3000;  // Initial servo position (90 degrees)
     }
     
     gz_bias = (float)gz_sum / num_samples;
