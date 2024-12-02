@@ -325,13 +325,15 @@ Serial.println("measure ultrasonic distance");
     PORTD |= (1 << TRIG_PIN);
     _delay_us(10);
     PORTD &= ~(1 << TRIG_PIN);
-
+Serial.println("line 328");
     // Wait for echo
     while (!(PIND & (1 << ECHO_PIN)));
     duration = 0;
+Serial.println("line 332");
     while ((PIND & (1 << ECHO_PIN))) {
         duration++;
         _delay_us(1);
+Serial.println("line 336");
         if (duration > 23200) break; // Timeout after ~4m
     }
 
