@@ -22,7 +22,6 @@
 #define ACCEL_SCALE 16384.0         // Accelerometer sensitivity scale factor
 
 // Control Parameters
-#define D1 15                       // Reference distance for US sensor
 #define MIN_SERVO_ANGLE 0           // Minimum servo angle
 #define MAX_SERVO_ANGLE 180         // Maximum servo angle
 #define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
@@ -85,6 +84,9 @@ ISR(TIMER1_COMPA_vect) {
 void setup(void) {
     cli(); // Disable global interrupts
 
+Serial.begin(9600);
+currentSpeed = 255;
+
     // Setup Timer1 for millisecond timing
     TCCR1A = (1 << WGM11);
     TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
@@ -93,9 +95,6 @@ void setup(void) {
 
     servo_write(90);  // Center the servo
     _delay_ms(1000);  // Allow everything to stabilize
-    
-    sei(); // Enable global interrupts
-    previous_time = customMillis();
 
     // Configure Timer1 for PWM generation
     TCCR1A = (1 << COM1A1) | (1 << WGM11);
@@ -132,6 +131,9 @@ void setup(void) {
     ax_bias = ((float)ax_sum / num_samples) / ACCEL_SCALE;
     ay_bias = ((float)ay_sum / num_samples) / ACCEL_SCALE;
     az_bias = ((float)az_sum / num_samples) / ACCEL_SCALE - 1.0;
+
+sei(); // Enable global interrupts
+    previous_time = customMillis();
 }
 
 
@@ -359,14 +361,17 @@ void scanEnvironment() {
 }
 
 void startHoverFan(void) {
+    Serial.println("startHoverFan()");
     PORTD |= (1 << HOVER_FAN_PIN);
 }
 
 void stopHoverFan(void) {
+    Serial.println("stopHoverFan()");
     PORTD &= ~(1 << HOVER_FAN_PIN);
 }
 
 void startPropulsionFan(uint8_t dutyCycle) {
+    Serial.println("startPropulsionFan()");
     static uint8_t timerInitialized = 0;
     if (!timerInitialized) {
         // Configure Timer0 for Fast PWM, 8-bit mode
@@ -379,6 +384,7 @@ void startPropulsionFan(uint8_t dutyCycle) {
 }
 
 void stopPropulsionFan(void) {
+    Serial.println("stopPropulsionFan()");
     OCR0A = 0;
 }
 
@@ -405,11 +411,14 @@ void adjustServoForStraightLine(void) {
 void handleState(void) {
     switch(currentState) {
         case INIT:
+            Serial.println("CURRENT STATE INIT");
             setup();
             currentState = IDLE;
             break;
             
         case IDLE:
+            Serial.println("CURRENT STATE IDLE");
+            Serial.println("StopFans()");
             stopPropulsionFan();
             stopHoverFan();
             _delay_ms(1000);
@@ -417,6 +426,7 @@ void handleState(void) {
             break;
             
         case SCAN:
+            Serial.println("CURRENT STATE SCAN");
             stopPropulsionFan();
             stopHoverFan();
             scanEnvironment();  // This will update state to MOVE if path is clear
@@ -424,6 +434,7 @@ void handleState(void) {
             break;
             
         case MOVE:
+            Serial.println("CURRENT STATE MOVE");
             startHoverFan();
             startPropulsionFan(255);
             adjustServoForStraightLine(); // Maintain straight line using IMU
