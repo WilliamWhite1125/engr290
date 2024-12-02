@@ -315,43 +315,48 @@ void servo_write(uint16_t angle) {
 }
 
 long measureUltrasonicDistance(void) {
-Serial.println("measure ultrasonic distance");
+    Serial.println("measure ultrasonic distance");
     long duration;
     int distance;
-
+    
     // Generate trigger pulse
     PORTB &= ~(1 << TRIG_PIN);
-    _delay_us(2);
+    delayMicroseconds(2);
     PORTB |= (1 << TRIG_PIN);
-    _delay_us(10);
+    delayMicroseconds(10);
     PORTB &= ~(1 << TRIG_PIN);
-Serial.println("line 328");
-    // Wait for echo
-    while (!(PIND & (1 << ECHO_PIN)));
-    duration = 0;
-Serial.println("line 332");
-    while ((PIND & (1 << ECHO_PIN))) {
-        duration++;
-        _delay_us(1);
-Serial.println("line 336");
-        if (duration > 23200) break; // Timeout after ~4m
-    }
 
+    Serial.println("line 328");
+    
+    // Wait for echo to start
+    while (!(PIND & (1 << ECHO_PIN)));
+    
+    // Start timing
+    unsigned long startTime = micros();  // Get start time
+    
+    Serial.println("line 332");
+    
+    // Wait for echo to end
+    while ((PIND & (1 << ECHO_PIN))) {
+        Serial.println("line 336");
+        if (micros() - startTime > 23200) break; // Timeout after ~4m
+    }
+    
+    // Calculate actual duration in microseconds
+    duration = micros() - startTime;
+    
     distance = duration * 0.0344 / 2;
-Serial.print("distance: ");
-Serial.println(distance);
+    Serial.print("distance: ");
+    Serial.println(distance);
     return distance;
 }
 
 bool isObstacleDetected(void) {
+    Serial.print("oui");
     long distance = measureUltrasonicDistance();
     return (distance < D1);
 }
 
-bool isGoalDetected(){
-   long distance = measureIRDistance();
-    return (distance>D2)&&(distance<D3);
-}
 void scanEnvironment(void) {
 
 Serial.println("ScanEnvironment()");
