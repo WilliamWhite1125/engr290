@@ -10,7 +10,7 @@
 #define TRIG_PIN PD3                // Trigger pin assigned to Arduino pin 3
 #define ECHO_PIN PD2                // Echo pin assigned to Arduino pin 2
 #define SERVO_PIN PB1               // Servo motor control pin (Arduino pin 9)
-#define HOVER_FAN_PIN PD5           // Hover fan (Fan 1) - On/Off
+#define HOVER_FAN_PIN PD4           // Hover fan (Fan 1) - On/Off
 #define PROPULSION_FAN_PIN PD6      // Propulsion fan (Fan 2) - PWM (0C0A)
 #define IR_PIN PC0                  // IR sensor pin
 
