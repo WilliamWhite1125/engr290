@@ -12,6 +12,7 @@
 #define SERVO_PIN PB1               // Servo motor control pin (Arduino pin 9)
 #define HOVER_FAN_PIN PD5           // Hover fan (Fan 1) - On/Off
 #define PROPULSION_FAN_PIN PD6      // Propulsion fan (Fan 2) - PWM (0C0A)
+#define IR_PIN PC0                  // IR sensor pin
 
 // IMU Definitions
 #define IMU_ADDRESS 0x68            // MPU-6050 I2C address
