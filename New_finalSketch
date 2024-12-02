@@ -1,17 +1,17 @@
-#include <avr/io.h>
+ #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <math.h>
 
 // Constants and Macros
-#define F_CPU 16000000UL          // 16 MHz clock speed
+#define F_CPU 16000000UL            // 16 MHz clock speed
 
 // Pin Definitions
-#define TRIG_PIN PD3              // Trigger pin assigned to Arduino pin 3
-#define ECHO_PIN PD2              // Echo pin assigned to Arduino pin 2
-#define SERVO_PIN PB1             // Servo motor control pin (Arduino pin 9)
-#define HOVER_FAN_PIN PD5         // Hover fan (Fan 1) - On/Off
-#define PROPULSION_FAN_PIN PD6    // Propulsion fan (Fan 2) - PWM (0C0A)
+#define TRIG_PIN PD3                // Trigger pin assigned to Arduino pin 3
+#define ECHO_PIN PD2                // Echo pin assigned to Arduino pin 2
+#define SERVO_PIN PB1               // Servo motor control pin (Arduino pin 9)
+#define HOVER_FAN_PIN PD5           // Hover fan (Fan 1) - On/Off
+#define PROPULSION_FAN_PIN PD6      // Propulsion fan (Fan 2) - PWM (0C0A)
 
 // IMU Definitions
 #define IMU_ADDRESS 0x68            // MPU-6050 I2C address
