@@ -7,7 +7,7 @@
 #define F_CPU 16000000UL            // 16 MHz clock speed
 
 // Pin Definitions
-#define TRIG_PIN PD3                // Trigger pin assigned to Arduino pin 3
+#define TRIG_PIN PB3                // Trigger pin assigned to Arduino pin 3
 #define ECHO_PIN PD2                // Echo pin assigned to Arduino pin 2
 #define SERVO_PIN PB1               // Servo motor control pin (Arduino pin 9)
 #define HOVER_FAN_PIN PD4           // Hover fan (Fan 1) - On/Off
@@ -88,7 +88,7 @@ void setup(void) {
     cli(); // Disable global interrupts
 
  // Pin Setup
-    DDRD |= (1 << TRIG_PIN);      // TRIG_PIN output
+    DDRB |= (1 << TRIG_PIN);      // TRIG_PIN output
     DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
     DDRD |= (1 << HOVER_FAN_PIN); // Hover fan output
     DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
@@ -320,11 +320,11 @@ Serial.println("measure ultrasonic distance");
     int distance;
 
     // Generate trigger pulse
-    PORTD &= ~(1 << TRIG_PIN);
+    PORTB &= ~(1 << TRIG_PIN);
     _delay_us(2);
-    PORTD |= (1 << TRIG_PIN);
+    PORTB |= (1 << TRIG_PIN);
     _delay_us(10);
-    PORTD &= ~(1 << TRIG_PIN);
+    PORTB &= ~(1 << TRIG_PIN);
 Serial.println("line 328");
     // Wait for echo
     while (!(PIND & (1 << ECHO_PIN)));
