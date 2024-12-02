@@ -95,7 +95,6 @@ void setup(void) {
     _delay_ms(1000);  // Allow everything to stabilize
     
     sei(); // Enable global interrupts
-    currentState = IDLE;
     previous_time = customMillis();
 
     // Configure Timer1 for PWM generation
