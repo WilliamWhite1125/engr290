@@ -348,7 +348,7 @@ bool isObstacleDetected(void) {
 
 bool isGoalDetected(){
    long distance = measureIRDistance();
-    return (distance>D2)&(distance<D3);
+    return (distance>D2)&&(distance<D3);
 }
 void scanEnvironment(void) {
 
