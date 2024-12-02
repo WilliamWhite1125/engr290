@@ -1,4 +1,4 @@
- #include <avr/io.h>
+#include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <math.h>
@@ -133,6 +133,7 @@ void setup(void) {
     ax_bias = ((float)ax_sum / num_samples) / ACCEL_SCALE;
     ay_bias = ((float)ay_sum / num_samples) / ACCEL_SCALE;
     az_bias = ((float)az_sum / num_samples) / ACCEL_SCALE - 1.0;
+}
 
 
 void I2C_init(void) {
