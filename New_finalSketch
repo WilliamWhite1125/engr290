@@ -79,21 +79,28 @@ void delay_ms(unsigned int ms);
 void delay_us(unsigned int us);
 unsigned long customMillis(void);
 
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER2_COMPA_vect) {
     milliseconds++;
 }
 
 void setup(void) {
     cli(); // Disable global interrupts
 
+ // Pin Setup
+    DDRD |= (1 << TRIG_PIN);      // TRIG_PIN output
+    DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
+    DDRD |= (1 << HOVER_FAN_PIN); // Hover fan output
+    DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
+    DDRB |= (1 << SERVO_PIN);     // Servo output
+
 Serial.begin(9600);
 currentSpeed = 255;
 
-    // Setup Timer1 for millisecond timing
-    TCCR1A = (1 << WGM11);
-    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
-    OCR1A = 39999;  // 50Hz for servo control
-    TIMSK1 = (1 << OCIE1A);
+    // Setup Timer2 for millisecond timing
+    TCCR2A = (1 << WGM21);
+    TCCR2B = (1 << WGM23) | (1 << WGM22) | (1 << CS21);
+    OCR2A = 39999;  // 50Hz for servo control
+    TIMSK2 = (1 << OCIE2A);
 
     servo_write(90);  // Center the servo
     _delay_ms(1000);  // Allow everything to stabilize
@@ -104,12 +111,6 @@ currentSpeed = 255;
     ICR1 = 39999;  // 50Hz PWM frequency
     OCR1A = 3000;  // Initial servo position (90 degrees)
 
-    // Pin Setup
-    DDRD |= (1 << TRIG_PIN);      // TRIG_PIN output
-    DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
-    DDRD |= (1 << HOVER_FAN_PIN); // Hover fan output
-    DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
-    DDRB |= (1 << SERVO_PIN);     // Servo output
 
     // Initialize I2C and MPU6050
     I2C_init();
@@ -342,13 +343,14 @@ bool isObstacleDetected(void) {
 
 void scanEnvironment() {
 
+Serial.println("ScanEnvironment()");
   float maxDistance = -1;
   float chosenAngle = 0;
   // Rotate servo to scan surroundings
   for (int angle = 0; angle <= 180; angle += 45) {
    servo_angle = angle;
     servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-    servo_write((uint16_t)servo_angle);
+    servo_write(servo_angle);
     _delay_ms(100);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
@@ -362,7 +364,7 @@ void scanEnvironment() {
     Serial.println(" cm");
 
     // need dont want to lock onto the wall nearby
-    if (distance > 25 && distance > maxDistance) {
+    if (distance > 20 && distance > maxDistance) {
       maxDistance = distance;
       chosenAngle = (float)angle;
     }
@@ -370,7 +372,7 @@ void scanEnvironment() {
   //write the angle with the greatest distance
   servo_angle = chosenAngle;
   servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-  servo_write((uint16_t)servo_angle);
+  servo_write(servo_angle);
 
 //output for testing
   Serial.print("Chosen Angle is ");
@@ -486,7 +488,6 @@ unsigned long customMillis(void) {
 
 int main(void) {
     setup();
-    
     while(1) {
         handleState();
     }
