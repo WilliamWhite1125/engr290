@@ -353,7 +353,7 @@ bool isGoalDetected(){
 void scanEnvironment(void) {
 
 Serial.println("ScanEnvironment()");
-  float maxDistance = -1;
+  float maxDistance = 0;
   float chosenAngle = 0;
   // Rotate servo to scan surroundings
   for (int angle = 0; angle <= 180; angle += 45) {
