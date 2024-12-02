@@ -28,7 +28,7 @@
 #define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
 #define YAW_CORRECTION_FACTOR 1.0   // Adjust based on testing
 #define D1 15
-
+#define D2 100
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
 // Global Variables
@@ -111,6 +111,8 @@ currentSpeed = 255;
     ICR1 = 39999;  // 50Hz PWM frequency
     OCR1A = 3000;  // Initial servo position (90 degrees)
 
+    // ADC setup for IR sensor
+    ADCSRA |= (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 
     // Initialize I2C and MPU6050
     I2C_init();
@@ -333,6 +335,44 @@ long measureUltrasonicDistance(void) {
     }
 
     distance = duration * 0.0344 / 2;
+    return distance;
+}
+
+float measureIRDistance() {
+    // Take multiple readings for stability
+    const int numReadings = 5;
+    long sum = 0;
+    
+    for(int i = 0; i < numReadings; i++) {
+        ADMUX = (1 << REFS0) | (IR_PIN & 0x0F); // Set reference voltage to AVCC
+        ADCSRA |= (1 << ADSC);  
+        while (ADCSRA & (1 << ADSC));  // Wait for conversion
+        sum += ADC;
+        _delay_ms(10); // Small delay between readings
+    }
+    
+    int reading = sum / numReadings;
+    float voltage = reading * (5.0 / 1024.0);
+    
+    // Improved distance calculation for GP2Y0A02YK0F
+    // Based on datasheet curve fitting
+    float distance = 65.0 * pow(voltage, -1.10);
+    
+    // Implement noise filtering
+    static float lastDistance = 0;
+    if (lastDistance != 0) {
+        // Simple low-pass filter
+        distance = 0.7 * distance + 0.3 * lastDistance;
+    }
+    lastDistance = distance;
+    
+    // Constrain output to valid range
+    if (distance < D1) {
+        distance = D1;
+    } else if (distance > D2) {
+        distance = D2;
+    }
+    
     return distance;
 }
 
