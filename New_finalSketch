@@ -220,3 +220,15 @@ void loop(){
   handleState();
 
 }
+
+int main(void) {
+    cli();  // Disable interrupts during setup
+    setup();
+    sei();  // Enable interrupts
+    
+    while(1) {  // Infinite loop
+        loop();
+    }
+    
+    return 0;  // Never reached
+}
