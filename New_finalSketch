@@ -413,7 +413,7 @@ void stopPropulsionFan(void) {
     OCR0A = 0;
 }
 
-/*void adjustServoForStraightLine(void) {
+void adjustServoForStraightLine(void) {
     // Read new IMU data
     readMPU6050();
     calculateAngles();
@@ -431,7 +431,7 @@ void stopPropulsionFan(void) {
     
     // Update servo position
     servo_write(new_angle);
-}*/
+}
 
 void handleState(void) {
     switch(currentState) {
@@ -459,7 +459,7 @@ void handleState(void) {
             Serial.println("CURRENT STATE MOVE");
             startHoverFan();
             startPropulsionFan(255);
-            //adjustServoForStraightLine(); // Maintain straight line using IMU
+            adjustServoForStraightLine(); // Maintain straight line using IMU
             _delay_ms(4000);  // Small delay before next adjustment
             if (isObstacleDetected()) {
                 currentState = IDLE;
