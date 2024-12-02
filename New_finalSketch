@@ -27,6 +27,7 @@
 #define MAX_SERVO_ANGLE 180         // Maximum servo angle
 #define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
 #define YAW_CORRECTION_FACTOR 1.0   // Adjust based on testing
+#define D1 15
 
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
@@ -345,7 +346,9 @@ void scanEnvironment() {
   float chosenAngle = 0;
   // Rotate servo to scan surroundings
   for (int angle = 0; angle <= 180; angle += 45) {
-    servo_write(angle);
+   servo_angle = angle;
+    servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
+    servo_write((uint16_t)servo_angle);
     _delay_ms(100);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
@@ -365,7 +368,9 @@ void scanEnvironment() {
     }
   }
   //write the angle with the greatest distance
-  servo_write(chosenAngle);
+  servo_angle = chosenAngle;
+  servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
+  servo_write((uint16_t)servo_angle);
 
 //output for testing
   Serial.print("Chosen Angle is ");
