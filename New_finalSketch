@@ -344,12 +344,19 @@ void scanEnvironment() {
   float maxDistance = -1;
   float chosenAngle = 0;
   // Rotate servo to scan surroundings
-  for (int angle = 0; angle <= 180; angle += 15) {
+  for (int angle = 0; angle <= 180; angle += 45) {
     servo_write(angle);
     _delay_ms(100);  // Allow sensor to stabilize
 
     // Evaluate distance using ultrasonic sensor
     float distance = measureUltrasonicDistance();
+
+ //output for testing
+    Serial.print("Distance at ");
+    Serial.print(angle);
+    Serial.print("* degrees is ");
+    Serial.print(distance);
+    Serial.println(" cm");
 
     // need dont want to lock onto the wall nearby
     if (distance > 25 && distance > maxDistance) {
@@ -359,6 +366,11 @@ void scanEnvironment() {
   }
   //write the angle with the greatest distance
   servo_write(chosenAngle);
+
+//output for testing
+  Serial.print("Chosen Angle is ");
+  Serial.print(servo_angle);
+  Serial.println(" degrees");
 }
 
 void startHoverFan(void) {
@@ -419,7 +431,6 @@ void handleState(void) {
             
         case IDLE:
             Serial.println("CURRENT STATE IDLE");
-            Serial.println("StopFans()");
             stopPropulsionFan();
             stopHoverFan();
             _delay_ms(1000);
@@ -428,8 +439,6 @@ void handleState(void) {
             
         case SCAN:
             Serial.println("CURRENT STATE SCAN");
-            stopPropulsionFan();
-            stopHoverFan();
             scanEnvironment();  // This will update state to MOVE if path is clear
             currentState = MOVE;
             break;
