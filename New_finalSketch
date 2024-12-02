@@ -315,6 +315,7 @@ void servo_write(uint16_t angle) {
 }
 
 long measureUltrasonicDistance(void) {
+Serial.println("measure ultrasonic distance");
     long duration;
     int distance;
 
@@ -335,6 +336,8 @@ long measureUltrasonicDistance(void) {
     }
 
     distance = duration * 0.0344 / 2;
+Serial.print("distance: ");
+Serial.println(distance);
     return distance;
 }
 
@@ -347,7 +350,7 @@ bool isGoalDetected(){
    long distance = measureIRDistance();
     return (distance>D2)&(distance<D3);
 }
-void scanEnvironment() {
+void scanEnvironment(void) {
 
 Serial.println("ScanEnvironment()");
   float maxDistance = -1;
