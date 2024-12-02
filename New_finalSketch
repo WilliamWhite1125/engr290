@@ -336,28 +336,31 @@ bool isObstacleDetected(void) {
     return (distance < D1);
 }
 
-void scanEnvironment(void) {
-    long distance = measureUltrasonicDistance();
-    
-    servo_write(servo_angle);
-    _delay_ms(200);  // Give servo time to move
-    
-    if (!isObstacleDetected()) {
-        currentState = MOVE;
-        return;
+void scanEnvironment() {
+
+  float maxDistance = -1;
+  float chosenAngle = 0;
+  // Rotate servo to scan surroundings
+  for (int angle = 0; angle <= 180; angle += 15) {
+    servo_write(angle);
+    _delay_ms(100);  // Allow sensor to stabilize
+
+    // Evaluate distance using ultrasonic sensor
+    float distance = measureUltrasonicDistance();
+
+    //output for testing
+    UART_print("Distance at ");
+    UART_printFloat(distance, 2);
+    UART_println(" cm");
+
+    // need dont want to lock onto the wall nearby
+    if (distance > 25 && distance > maxDistance) {
+      maxDistance = distance;
+      chosenAngle = (float)angle;
     }
-    
-    // Update servo angle for next scan
-    if (servo_angle == 90) {
-        servo_angle = 0;
-    // Continuing from scanEnvironment()
-    } else if (servo_angle == 0) {
-        servo_angle = 180;
-    } else if (servo_angle == 180) {
-        servo_angle = 90;
-    }
-    
-    currentState = SCAN;
+  }
+  //write the angle with the greatest distance
+  servo_write(chosenAngle);
 }
 
 void startHoverFan(void) {
@@ -422,17 +425,21 @@ void handleState(void) {
             stopPropulsionFan();
             stopHoverFan();
             scanEnvironment();  // This will update state to MOVE if path is clear
+            currentState = MOVE;
             break;
             
         case MOVE:
-            if (isObstacleDetected()) {
-                currentState = SCAN;
-                break;
-            }
             startHoverFan();
             startPropulsionFan(255);
             adjustServoForStraightLine(); // Maintain straight line using IMU
-            _delay_ms(50);  // Small delay before next adjustment
+            _delay_ms(4000);  // Small delay before next adjustment
+            if (isObstacleDetected()) {
+                currentState = IDLE;
+                break;
+            }
+        //if(goalDetected()==1){
+        //currentState=STOP
+        //}
             break;
     }
 }
