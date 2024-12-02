@@ -14,7 +14,7 @@
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
 #define DISTANCE_THRESHOLD 30     //(cm) Adjust based on testing results
 
-#define HOVER_FAN_PIN PD4        // Hover fan (Fan 1) - On/Off
+#define HOVER_FAN_PIN PD5        // Hover fan (Fan 1) - On/Off
 #define PROPULSION_FAN_PIN PD6   // Propulsion fan (Fan 2) - PWM (0C0A)
 
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
@@ -187,11 +187,11 @@ void startPropulsionFan(uint8_t dutyCycle) {
         TCCR2B |= (1 << CS21) | (1 << CS20);    // Prescaler 64 (~490 Hz)
         timerInitialized = 1;
     }
-    OCR2A = dutyCycle; // Set duty cycle (0-255)
+    OCR0A = dutyCycle; // Set duty cycle (0-255)
 }
 
 void stopPropulsionFan() {
-    OCR2A = 0; // Set duty cycle to 0 to stop propulsion fan
+    OCR0A = 0; // Set duty cycle to 0 to stop propulsion fan
 }
 
 void handleState() {
