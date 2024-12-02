@@ -61,11 +61,6 @@ void setup() {
     currentState = IDLE;
 }
 
-// Main Function
-int main() {
-
-}
-
 void servo_write(uint16_t angle) {
     // Constrain angle to 0-180
     angle = constrain(angle, 0, 180);
@@ -147,7 +142,7 @@ return 0;
 }
 
 void scanEnvironment() {
-    while (isObstacleDetected()) {
+    while (isObstacleDetected()==1) {
         servo_write(servo_angle);
         if (servo_angle == 90 || servo_angle == 0) {
             servo_angle += 90;
@@ -229,6 +224,9 @@ int main(void) {
     while(1) {  // Infinite loop
         loop();
     }
+    
+    return 0;  // Never reached
+}
     
     return 0;  // Never reached
 }
