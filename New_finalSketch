@@ -34,37 +34,31 @@ void setupPWM();
 // Timer interrupt for custom millis
 ISR(TIMER1_COMPA_vect) {
     milliseconds++;
-    
-DDRD |= (1 << HOVER_FAN_PIN);     // Set hover fan pin as output
-DDRD |= (1 << PROPULSION_FAN_PIN); // Set propulsion fan pin as output
 }
 
 void setup() {
-    // Initialize Timer1 for millisecond timing
-    TCCR1A = (1 << WGM11);        // CTC mode
-    OCR1A = 249;                  // 1 ms interrupt at 16 MHz with prescaler 64
-    TIMSK1 = (1 << OCIE1A);       // Enable Timer1 compare match interrupt
-    TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
+    // Initialize Timer2 for millisecond timing
+    TCCR2A = (1 << WGM21);        // CTC mode
+    OCR2A = 249;                   // 1 ms interrupt at 16 MHz with prescaler 64
+    TIMSK2 = (1 << OCIE2A);       // Enable Timer2 compare match interrupt
+    TCCR2B = (1 << CS22);         // Prescaler 64
     
+    // Rest of your setup code...
     Serial.begin(9600);
     Serial.println("CURRENT STATE INIT");
 
-    // Set TRIG_PIN as output, ECHO_PIN as input
-    DDRD |= (1 << TRIG_PIN);  // TRIG_PIN (PD3) output
-    DDRD &= ~(1 << ECHO_PIN); // ECHO_PIN (PD2) input
-
-    // Setup Servo pin (PB1 - Arduino pin 9)
-    DDRB |= (1 << SERVO_PIN); // Set PB1 (Arduino pin 9) as output for servo control
-    servo_write((uint16_t)servo_angle);
-    _delay_ms(1000);  // Allow sensor to stabilize
+    // Set pin directions
+    DDRD |= (1 << TRIG_PIN);      // TRIG_PIN output
+    DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
+    DDRD |= (1 << HOVER_FAN_PIN); // Hover fan output
+    DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
+    DDRB |= (1 << SERVO_PIN);     // Servo output
 
     setupPWM();
+    servo_write(90);  // Center the servo
+    _delay_ms(1000);  // Allow everything to stabilize
     
-    currentSpeed = 255;
     currentState = IDLE;
-    
-    DDRD |= (1 << HOVER_FAN_PIN);     // Set hover fan pin as output
-    DDRD |= (1 << PROPULSION_FAN_PIN); // Set propulsion fan pin as output
 }
 
 void servo_write(uint16_t angle) {
@@ -149,15 +143,31 @@ return 0;
 }
 
 void scanEnvironment() {
-    while (isObstacleDetected()==1) {
-        servo_write(servo_angle);
-        if (servo_angle == 90 || servo_angle == 0) {
-            servo_angle += 90;
-        } else if (servo_angle == 180) {
-            servo_angle -= 180;
-        }
+    // Print distance for debugging
+    long distance = measureUltrasonicDistance();
+    Serial.print("Distance: ");
+    Serial.println(distance);
+    
+    // Move servo to scan for clear path
+    servo_write(servo_angle);
+    _delay_ms(200);  // Give servo time to move
+    
+    if (!isObstacleDetected()) {
+        currentState = MOVE;
+        return;
     }
-    currentState = MOVE;
+    
+    // Update servo angle for next scan
+    if (servo_angle == 90) {
+        servo_angle = 0;
+    } else if (servo_angle == 0) {
+        servo_angle = 180;
+    } else if (servo_angle == 180) {
+        servo_angle = 90;
+    }
+    
+    // Stay in SCAN state
+    currentState = SCAN;
 }
 
 void startHoverFan(){
@@ -181,43 +191,44 @@ void startPropulsionFan(uint8_t dutyCycle) {
 }
 
 void stopPropulsionFan() {
-    OCR0A = 0; // Set duty cycle to 0 to stop propulsion fan
+    OCR2A = 0; // Set duty cycle to 0 to stop propulsion fan
 }
 
-void handleState(){
-  switch(currentState){
-    case INIT:
-  setup();
-  currentState=IDLE;
-  break;
-    case IDLE:
-      stopPropulsionFan();
-      stopHoverFan();
-      _delay_ms(1000);
-      currentState=SCAN;
-      break;
-    case SCAN:
-      stopPropulsionFan();
-      stopHoverFan();
-      scanEnvironment();
-      currentState=MOVE;
-    break;
-    case MOVE:
-      startHoverFan();
-      startPropulsionFan(255);
-      _delay_ms(4000);
-
-      while(isObstacleDetected()==1){
-  currentState=SCAN;
-} 
-//if(isGoalDetected()){currentState=STOP;} 
-//break;
-    //case STOP:
-  //stopPropulsionFan();
-  //stopHoverFan();
-  //break;
-  }
+void handleState() {
+    Serial.print("Current State: ");
+    Serial.println(currentState);
+    
+    switch(currentState) {
+        case INIT:
+            setup();
+            currentState = IDLE;
+            break;
+            
+        case IDLE:
+            stopPropulsionFan();
+            stopHoverFan();
+            _delay_ms(1000);
+            currentState = SCAN;
+            break;
+            
+        case SCAN:
+            stopPropulsionFan();
+            stopHoverFan();
+            scanEnvironment();  // This will update state to MOVE if path is clear
+            break;
+            
+        case MOVE:
+            if (isObstacleDetected()) {
+                currentState = SCAN;
+                break;
+            }
+            startHoverFan();
+            startPropulsionFan(255);
+            _delay_ms(1000);  // Move for a short time before checking again
+            break;
+    }
 }
+
 void loop(){
   handleState();
 
