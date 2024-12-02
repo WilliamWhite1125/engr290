@@ -14,6 +14,9 @@
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
 #define DISTANCE_THRESHOLD 30     //(cm) Adjust based on testing results
 
+#define HOVER_FAN_PIN PD4        // Hover fan (Fan 1) - On/Off
+#define PROPULSION_FAN_PIN PD6   // Propulsion fan (Fan 2) - PWM (0C0A)
+
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
 // Global variables
@@ -182,9 +185,9 @@ void stopPropulsionFan() {
 void handleState(){
   switch(currentState){
     case INIT:
-	setup();
-	currentState=IDLE:
-	break;
+  setup();
+  currentState=IDLE;
+  break;
     case IDLE:
       stopPropulsionFan();
       stopHoverFan();
@@ -192,6 +195,8 @@ void handleState(){
       currentState=SCAN;
       break;
     case SCAN:
+      stopPropulsionFan();
+      stopHoverFan();
       scanEnvironment();
       currentState=MOVE;
     break;
@@ -201,18 +206,17 @@ void handleState(){
       _delay_ms(4000);
 
       while(isObstacleDetected()==1){
-	currentState=SCAN;
-}	if(isGoalDetected()){
-	currentState=STOP;
+  currentState=SCAN;
 } 
-	break;
-    case STOP:
-	stopPropulsionFan();
-	stopHoverFan();
-	break;
+//if(isGoalDetected()){currentState=STOP;} 
+//break;
+    //case STOP:
+  //stopPropulsionFan();
+  //stopHoverFan();
+  //break;
   }
 }
 void loop(){
-	handleState();
+  handleState();
 
 }
