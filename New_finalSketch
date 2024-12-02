@@ -14,9 +14,6 @@
 #define MAX_SERVO_ANGLE 180       // Maximum servo angle
 #define DISTANCE_THRESHOLD 30     //(cm) Adjust based on testing results
 
-#define HOVER_FAN_PIN PD4        // Hover fan (Fan 1) - On/Off
-#define PROPULSION_FAN_PIN PD6   // Propulsion fan (Fan 2) - PWM (0C0A)
-
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
 // Global variables
@@ -34,6 +31,9 @@ void setupPWM();
 // Timer interrupt for custom millis
 ISR(TIMER1_COMPA_vect) {
     milliseconds++;
+
+    DDRD |= (1 << HOVER_FAN_PIN);     // Set hover fan pin as output
+    DDRD |= (1 << PROPULSION_FAN_PIN); // Set propulsion fan pin as output
 }
 
 void setup() {
@@ -61,6 +61,11 @@ void setup() {
     currentState = IDLE;
 }
 
+// Main Function
+int main() {
+
+}
+
 void servo_write(uint16_t angle) {
     // Constrain angle to 0-180
     angle = constrain(angle, 0, 180);
@@ -86,11 +91,12 @@ long measureUltrasonicDistance() {
     long duration; 
     int distance;  
 
-    PORTB &= ~(1 << TRIG_PIN); 
+    // Correct PORT usage for TRIG_PIN (PD3)
+    PORTD &= ~(1 << TRIG_PIN); 
     _delay_us(2); 
-    PORTB |= (1 << TRIG_PIN); 
+    PORTD |= (1 << TRIG_PIN); 
     _delay_us(10); 
-    PORTB &= ~(1 << TRIG_PIN); 
+    PORTD &= ~(1 << TRIG_PIN); 
 
     duration = pulseIn(ECHO_PIN, HIGH); 
     distance = duration * 0.0344 / 2; 
@@ -142,17 +148,25 @@ return 0;
 }
 
 void scanEnvironment() {
-    while (isObstacleDetected()==1) {
-        servo_write(servo_angle);
-        if (servo_angle == 90 || servo_angle == 0) {
-            servo_angle += 90;
-        } else if (servo_angle == 180) {
-            servo_angle -= 180;
-        }
+    // Move servo to scan for clear path
+    servo_write(servo_angle);
+    _delay_ms(100);  // Give servo time to move
+    
+    if (!isObstacleDetected()) {
+        currentState = MOVE;
+        return;
     }
-    currentState = MOVE;
+    
+    // Update servo angle for next scan
+    if (servo_angle == 90 || servo_angle == 0) {
+        servo_angle += 90;
+    } else if (servo_angle == 180) {
+        servo_angle = 0;  // Reset to start position
+    }
+    
+    // Stay in SCAN state if obstacle still detected
+    currentState = SCAN;
 }
-
 void startHoverFan(){
 PORTD |= (1 << HOVER_FAN_PIN); // Set PD4 high to turn on hover fan
 }
@@ -179,10 +193,8 @@ void stopPropulsionFan() {
 
 void handleState(){
   switch(currentState){
-    case INIT:
-  setup();
-  currentState=IDLE;
-  break;
+    case INIT://work on it
+    
     case IDLE:
       stopPropulsionFan();
       stopHoverFan();
@@ -190,8 +202,6 @@ void handleState(){
       currentState=SCAN;
       break;
     case SCAN:
-      stopPropulsionFan();
-      stopHoverFan();
       scanEnvironment();
       currentState=MOVE;
     break;
@@ -202,31 +212,13 @@ void handleState(){
 
       while(isObstacleDetected()==1){
   currentState=SCAN;
+} if(isGoalDetected()){
+  currentState=STOP;
 } 
-//if(isGoalDetected()){currentState=STOP;} 
-//break;
-    //case STOP:
-  //stopPropulsionFan();
-  //stopHoverFan();
-  //break;
+  break;
+    case STOP:
+  stopPropulsionFan();
+  stopHoverFan();
+  break;
   }
-}
-void loop(){
-  handleState();
-
-}
-
-int main(void) {
-    cli();  // Disable interrupts during setup
-    setup();
-    sei();  // Enable interrupts
-    
-    while(1) {  // Infinite loop
-        loop();
-    }
-    
-    return 0;  // Never reached
-}
-    
-    return 0;  // Never reached
 }
