@@ -97,22 +97,23 @@ void setup(void) {
 Serial.begin(9600);
 currentSpeed = 255;
 
-       TCCR2A = (1 << WGM21);  // CTC mode
-       TCCR2B = (1 << CS22);   // Prescaler 64
-       OCR2A = 249;            // This will give you roughly 1000Hz
-       TIMSK2 = (1 << OCIE2A); // Enable compare match interrupt
-
-       TCNT2 = 0;
+    // Setup Timer2 for milliseconds
+    TCCR2A = (1 << WGM21);  // CTC mode
+    TCCR2B = (1 << CS22);   // Prescaler 64
+    OCR2A = 249;            // This will give you roughly 1000Hz
+    TIMSK2 = (1 << OCIE2A); // Enable compare match interrupt
+    TCNT2 = 0;
 
     servo_write(90);  // Center the servo
     _delay_ms(1000);  // Allow everything to stabilize
-
-    // Configure Timer1 for PWM generation
-    TCCR1A = (1 << COM1A1) | (1 << WGM11);
-    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
-    ICR1 = 39999;  // 50Hz PWM frequency
-    OCR1A = 3000;  // Initial servo position (90 degrees)
-
+    
+    TCCR1A = (1 << COM1A1) | (1 << WGM11);          // Fast PWM mode, non-inverting
+    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11); // Fast PWM, prescaler = 8
+    ICR1 = 39999;   // TOP value for 50Hz (20ms period) = 16MHz/(8*50Hz) - 1
+    OCR1A = 3000;   // Initial position (~90 degrees)
+    
+    // Ensure PB1 (OC1A) is set as output
+    DDRB |= (1 << PB1);
 
     // Initialize I2C and MPU6050
     I2C_init();
@@ -348,42 +349,40 @@ bool isObstacleDetected(void) {
 }
 
 void scanEnvironment(void) {
-
-Serial.println("ScanEnvironment()");
-  float maxDistance = 0;
-  float chosenAngle = 0;
-  // Rotate servo to scan surroundings
-  for (int angle = 0; angle <= 180; angle += 45) {
-   servo_angle = angle;
-    servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-    servo_write(servo_angle);
-    _delay_ms(100);  // Allow sensor to stabilize
-
-    // Evaluate distance using ultrasonic sensor
-    float distance = measureUltrasonicDistance();
-
- //output for testing
-    Serial.print("Distance at ");
-    Serial.print(angle);
-    Serial.print("* degrees is ");
-    Serial.print(distance);
-    Serial.println(" cm");
-
-    // need dont want to lock onto the wall nearby
-    if (distance > 20 && distance > maxDistance) {
-      maxDistance = distance;
-      chosenAngle = (float)angle;
+    Serial.println("ScanEnvironment()");
+    float maxDistance = 0;
+    float chosenAngle = 0;
+    
+    // Rotate servo to scan surroundings
+    for (int angle = 0; angle <= 180; angle += 45) {
+        servo_write(angle);
+        _delay_ms(500);  // Increased delay to ensure servo reaches position
+        
+        // Evaluate distance using ultrasonic sensor
+        float distance = measureUltrasonicDistance();
+        
+        // Output for testing
+        Serial.print("Distance at ");
+        Serial.print(angle);
+        Serial.print("* degrees is ");
+        Serial.print(distance);
+        Serial.println(" cm");
+        
+        // Don't want to lock onto the wall nearby
+        if (distance > 20 && distance > maxDistance) {
+            maxDistance = distance;
+            chosenAngle = (float)angle;
+        }
     }
-  }
-  //write the angle with the greatest distance
-  servo_angle = chosenAngle;
-  servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-  servo_write(servo_angle);
-
-//output for testing
-  Serial.print("Chosen Angle is ");
-  Serial.print(servo_angle);
-  Serial.println(" degrees");
+    
+    // Write the angle with the greatest distance
+    servo_write(chosenAngle);
+    _delay_ms(500);  // Give servo time to reach final position
+    
+    // Output for testing
+    Serial.print("Chosen Angle is ");
+    Serial.print(chosenAngle);
+    Serial.println(" degrees");
 }
 
 void startHoverFan(void) {
@@ -414,7 +413,7 @@ void stopPropulsionFan(void) {
     OCR0A = 0;
 }
 
-void adjustServoForStraightLine(void) {
+/*void adjustServoForStraightLine(void) {
     // Read new IMU data
     readMPU6050();
     calculateAngles();
@@ -432,7 +431,7 @@ void adjustServoForStraightLine(void) {
     
     // Update servo position
     servo_write(new_angle);
-}
+}*/
 
 void handleState(void) {
     switch(currentState) {
@@ -460,7 +459,7 @@ void handleState(void) {
             Serial.println("CURRENT STATE MOVE");
             startHoverFan();
             startPropulsionFan(255);
-            adjustServoForStraightLine(); // Maintain straight line using IMU
+            //adjustServoForStraightLine(); // Maintain straight line using IMU
             _delay_ms(4000);  // Small delay before next adjustment
             if (isObstacleDetected()) {
                 currentState = IDLE;
