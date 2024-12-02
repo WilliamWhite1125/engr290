@@ -315,39 +315,29 @@ void servo_write(uint16_t angle) {
 }
 
 long measureUltrasonicDistance(void) {
-    Serial.println("measure ultrasonic distance");
+Serial.println("measure ultrasonic distance");
     long duration;
     int distance;
-    
+
     // Generate trigger pulse
     PORTB &= ~(1 << TRIG_PIN);
-    delayMicroseconds(2);
+    _delay_us(2);
     PORTB |= (1 << TRIG_PIN);
-    delayMicroseconds(10);
+    _delay_us(10);
     PORTB &= ~(1 << TRIG_PIN);
-
-    Serial.println("line 328");
-    
-    // Wait for echo to start
+Serial.println("line 328");
+    // Wait for echo
     while (!(PIND & (1 << ECHO_PIN)));
-    
-    // Start timing
-    unsigned long startTime = micros();  // Get start time
-    
-    Serial.println("line 332");
-    
-    // Wait for echo to end
+    duration = 0;
     while ((PIND & (1 << ECHO_PIN))) {
-        Serial.println("line 336");
-        if (micros() - startTime > 23200) break; // Timeout after ~4m
+        duration++;
+        _delay_us(1);
+        if (duration > 23200) break; // Timeout after ~4m
     }
-    
-    // Calculate actual duration in microseconds
-    duration = micros() - startTime;
-    
+
     distance = duration * 0.0344 / 2;
-    Serial.print("distance: ");
-    Serial.println(distance);
+Serial.print("distance: ");
+Serial.println(distance);
     return distance;
 }
 
