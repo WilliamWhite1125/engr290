@@ -1,306 +1,160 @@
-#include <avr/io.h>
-#include <avr/interrupt.h>
 #include <util/delay.h>
-#include <math.h>
+#include <avr/io.h>
 
-// Constants and Macros
-#define F_CPU 16000000UL            // 16 MHz clock speed
+#define F_CPU 16000000UL         // Clock speed
 
-// Pin Definitions
-#define TRIG_PIN PB3                // Trigger pin assigned to Arduino pin 3
-#define ECHO_PIN PD2                // Echo pin assigned to Arduino pin 2
-#define SERVO_PIN PB1               // Servo motor control pin (Arduino pin 9)
-#define HOVER_FAN_PIN PD4           // Hover fan (Fan 1) - On/Off
-#define PROPULSION_FAN_PIN PD6      // Propulsion fan (Fan 2) - PWM (0C0A)
-#define IR_PIN PC0                  // IR sensor pin
+// Updated Pin Definitions for WOWKI design
+#define TRIG_PIN PD3             // Trigger pin assigned to Arduino pin 3
+#define ECHO_PIN PD2             // Echo pin assigned to Arduino pin 2
+#define SERVO_PIN PB1            // Servo motor control pin (Arduino pin 9)
 
-// IMU Definitions
-#define IMU_ADDRESS 0x68            // MPU-6050 I2C address
-#define I2C_DELAY_US 5              // I2C communication delay in microseconds
-#define SDA_PIN PC4                 // SDA connected to PC4 (Arduino A4)
-#define SCL_PIN PC5                 // SCL connected to PC5 (Arduino A5)
-#define GYRO_SENSITIVITY 131.0      // Gyroscope sensitivity scale factor
-#define ACCEL_SCALE 16384.0         // Accelerometer sensitivity scale factor
+// Servo and Distance Parameters
+#define MIN_SERVO_ANGLE 0         // Minimum servo angle
+#define MAX_SERVO_ANGLE 180       // Maximum servo angle
+#define DISTANCE_THRESHOLD 30     //(cm) Adjust based on testing results
 
-// Control Parameters
-#define MIN_SERVO_ANGLE 0           // Minimum servo angle
-#define MAX_SERVO_ANGLE 180         // Maximum servo angle
-#define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
-#define YAW_CORRECTION_FACTOR 1.0   // Adjust based on testing
-#define D1 15
-#define D2 40
-#define D3 60
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
-// Global Variables
-volatile unsigned long milliseconds = 0;
-uint16_t servo_angle = 90;
+// Global variables
+volatile unsigned long milliseconds = 0; // Millisecond counter for timing
+float servo_angle = 90.0; // Initialize to middle position
 enum State { INIT, IDLE, SCAN, MOVE };
 State currentState = INIT;
 float currentSpeed = 0;
-unsigned long previous_time = 0;
-
-// IMU Variables
-int16_t gx_raw, gy_raw, gz_raw;
-int16_t ax_raw, ay_raw, az_raw;
-float gyro_z;
-float yaw = 0;
-float roll = 0.0, pitch = 0.0;
-float delta_t;
-float gz_bias = 0.0;
-float ax_bias = 0.0, ay_bias = 0.0, az_bias = 0.0;
-float Ax_cal, Ay_cal, Az_cal;
 
 // Function Prototypes
-void setup(void);
-void I2C_init(void);
-void I2C_start(void);
-void I2C_stop(void);
-uint8_t I2C_write_byte(uint8_t data);
-uint8_t I2C_read_byte(uint8_t ack);
-void SDA_HIGH(void);
-void SDA_LOW(void);
-void SCL_HIGH(void);
-void SCL_LOW(void);
-uint8_t SDA_READ(void);
-void MPU6050_init(void);
-void readMPU6050(void);
-void calculateAngles(void);
+void setup();
+void handleState();
+void scanEnvironment();
+bool isObstacleDetected();
+long measureUltrasonicDistance();
 void servo_write(uint16_t angle);
-long measureUltrasonicDistance(void);
-void handleState(void);
-bool isObstacleDetected(void);
-void scanEnvironment(void);
-void startHoverFan(void);
-void stopHoverFan(void);
-void startPropulsionFan(uint8_t dutyCycle);
-void stopPropulsionFan(void);
-void adjustServoForStraightLine(void);
-void delay_ms(unsigned int ms);
-void delay_us(unsigned int us);
-unsigned long customMillis(void);
+void setupPWM();
 
-ISR(TIMER2_COMPA_vect) {
+// Timer interrupt for custom millis
+ISR(TIMER1_COMPA_vect) {
     milliseconds++;
 }
 
-void setup(void) {
-    cli(); // Disable global interrupts
+void setup() {
+    // Initialize Timer1 for millisecond timing
+    TCCR1A = (1 << WGM11);        // CTC mode
+    OCR1A = 249;                  // 1 ms interrupt at 16 MHz with prescaler 64
+    TIMSK1 = (1 << OCIE1A);       // Enable Timer1 compare match interrupt
+    TCCR1B = (1 << CS11) | (1 << CS10); // Prescaler 64
 
- // Pin Setup
-    DDRB |= (1 << TRIG_PIN);      // TRIG_PIN output
-    DDRD &= ~(1 << ECHO_PIN);     // ECHO_PIN input
-    DDRD |= (1 << HOVER_FAN_PIN); // Hover fan output
-    DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
-    DDRB |= (1 << SERVO_PIN);     // Servo output
+    Serial.begin(9600);
+    Serial.println("CURRENT STATE INIT");
 
-Serial.begin(9600);
-currentSpeed = 255;
+    // Set TRIG_PIN as output, ECHO_PIN as input
+    DDRD |= (1 << TRIG_PIN);  // TRIG_PIN (PD3) output
+    DDRD &= ~(1 << ECHO_PIN); // ECHO_PIN (PD2) input
 
-    // Setup Timer2 for milliseconds
-    TCCR2A = (1 << WGM21);  // CTC mode
-    TCCR2B = (1 << CS22);   // Prescaler 64
-    OCR2A = 249;            // This will give you roughly 1000Hz
-    TIMSK2 = (1 << OCIE2A); // Enable compare match interrupt
-    TCNT2 = 0;
+    // Setup Servo pin (PB1 - Arduino pin 9)
+    DDRB |= (1 << SERVO_PIN); // Set PB1 (Arduino pin 9) as output for servo control
+    servo_write((uint16_t)servo_angle);
+    _delay_ms(1000);  // Allow sensor to stabilize
 
-    servo_write(90);  // Center the servo
-    _delay_ms(1000);  // Allow everything to stabilize
+    setupPWM();
     
-    TCCR1A = (1 << COM1A1) | (1 << WGM11);          // Fast PWM mode, non-inverting
-    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11); // Fast PWM, prescaler = 8
-    ICR1 = 39999;   // TOP value for 50Hz (20ms period) = 16MHz/(8*50Hz) - 1
-    OCR1A = 3000;   // Initial position (~90 degrees)
-    
-    // Ensure PB1 (OC1A) is set as output
-    DDRB |= (1 << PB1);
+    currentSpeed = 255;
+    currentState = IDLE;
+}
 
-    // Initialize I2C and MPU6050
-    I2C_init();
-    MPU6050_init();
+// Main Function
+int main() {
+    setup();
+    while (1) {
+        servo_write(0);
+        _delay_ms(3000);
+        servo_write(90);
+        _delay_ms(3000);
+        servo_write(180);
+        _delay_ms(3000);
 
-    // Calibrate IMU
-    int num_samples = 2000;
-    long gz_sum = 0;
-    long ax_sum = 0, ay_sum = 0, az_sum = 0;
-
-    for (int i = 0; i < num_samples; i++) {
-        readMPU6050();
-        gz_sum += gz_raw;
-        ax_sum += ax_raw;
-        ay_sum += ay_raw;
-        az_sum += az_raw;
-        _delay_ms(1);
     }
-    
-    gz_bias = (float)gz_sum / num_samples;
-    ax_bias = ((float)ax_sum / num_samples) / ACCEL_SCALE;
-    ay_bias = ((float)ay_sum / num_samples) / ACCEL_SCALE;
-    az_bias = ((float)az_sum / num_samples) / ACCEL_SCALE - 1.0;
-
-sei(); // Enable global interrupts
-    previous_time = customMillis();
+    return 0; // Not reached
 }
 
+// Measure distance with ultrasonic sensor
+long measureUltrasonicDistance() {
+    long duration;
+    int distance;
 
-void I2C_init(void) {
-    PORTC |= (1 << PC4) | (1 << PC5); // Enable pull-up resistors on SDA and SCL
+    PORTD &= ~(1 << TRIG_PIN); // Set TRIG_PIN LOW
+    _delay_us(2);
+    PORTD |= (1 << TRIG_PIN);  // Set TRIG_PIN HIGH
+    _delay_us(10);
+    PORTD &= ~(1 << TRIG_PIN); // Set TRIG_PIN LOW
+
+    // Measure the duration of the echo
+    duration = pulseIn(ECHO_PIN, HIGH);
+    distance = duration * 0.0344 / 2;
+
+    return distance;
 }
 
-void I2C_start(void) {
-    SDA_HIGH();
-    SCL_HIGH();
-    delay_us(I2C_DELAY_US);
-    SDA_LOW();
-    delay_us(I2C_DELAY_US);
-    SCL_LOW();
+void handleState() {
+    switch (currentState) {
+        case IDLE:
+            Serial.println("CURRENT STATE IDLE");
+            Serial.println("StopFans()");
+            _delay_ms(1000); // Wait for stability
+            currentState = SCAN;
+            break;
+
+        case SCAN:
+            Serial.println("CURRENT STATE SCAN");
+            scanEnvironment();
+            currentState = MOVE;
+            break;
+
+        case MOVE:
+            Serial.println("CURRENT STATE MOVE");
+            Serial.println("startHoverFan()");
+            Serial.println("startPropulsionFan()");
+            _delay_ms(4000); // Simulate movement
+            if (isObstacleDetected()) {
+                Serial.println("Obstacle Detected");
+                currentState = SCAN;
+            }
+            break;
+    }
 }
 
-void I2C_stop(void) {
-    SDA_LOW();
-    delay_us(I2C_DELAY_US);
-    SCL_HIGH();
-    delay_us(I2C_DELAY_US);
-    SDA_HIGH();
-    delay_us(I2C_DELAY_US);
-}
+void scanEnvironment() {
+    float maxDistance = -1;
+    float chosenAngle = 0;
 
-uint8_t I2C_write_byte(uint8_t data) {
-    for (uint8_t i = 0; i < 8; i++) {
-        if (data & 0x80) {
-            SDA_HIGH();
-        } else {
-            SDA_LOW();
+    for (int angle = 0; angle <= 180; angle += 15) {
+        servo_angle = constrain(angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
+        servo_write((uint16_t)servo_angle);
+        _delay_ms(100); // Allow sensor to stabilize
+
+        long distance = measureUltrasonicDistance();
+
+        Serial.print("Distance at ");
+        Serial.print(angle);
+        Serial.print("* degrees: ");
+        Serial.print(distance);
+        Serial.println(" cm");
+
+        if (distance > 25 && distance > maxDistance) {
+            maxDistance = distance;
+            chosenAngle = (float)angle;
         }
-        data <<= 1;
-        SCL_HIGH();
-        delay_us(I2C_DELAY_US);
-        SCL_LOW();
-        delay_us(I2C_DELAY_US);
     }
-    // ACK/NACK
-    SDA_HIGH(); // Release SDA
-    SCL_HIGH();
-    delay_us(I2C_DELAY_US);
-    uint8_t ack = !(SDA_READ());
-    SCL_LOW();
-    return ack;
+    chosenAngle = 90;
+    servo_angle = chosenAngle;
+    servo_write((uint16_t)servo_angle);
+
+    Serial.print("Chosen Angle: ");
+    Serial.println(servo_angle);
 }
 
-uint8_t I2C_read_byte(uint8_t ack) {
-    uint8_t data = 0;
-    SDA_HIGH(); // Release SDA
-    for (uint8_t i = 0; i < 8; i++) {
-        data <<= 1;
-        SCL_HIGH();
-        delay_us(I2C_DELAY_US);
-        if (SDA_READ()) {
-            data |= 1;
-        }
-        SCL_LOW();
-        delay_us(I2C_DELAY_US);
-    }
-    // Send ACK/NACK
-    if (ack) {
-        SDA_LOW(); // ACK
-    } else {
-        SDA_HIGH(); // NACK
-    }
-    SCL_HIGH();
-    delay_us(I2C_DELAY_US);
-    SCL_LOW();
-    return data;
-}
-
-void SDA_HIGH(void) {
-    PORTC |= (1 << PC4);
-    DDRC &= ~(1 << PC4); // Input mode
-}
-
-void SDA_LOW(void) {
-    DDRC |= (1 << PC4);  // Output mode
-    PORTC &= ~(1 << PC4); // Low
-}
-
-void SCL_HIGH(void) {
-    PORTC |= (1 << PC5);
-    DDRC &= ~(1 << PC5); // Input mode
-}
-
-void SCL_LOW(void) {
-    DDRC |= (1 << PC5);  // Output mode
-    PORTC &= ~(1 << PC5); // Low
-}
-
-uint8_t SDA_READ(void) {
-    return (PINC & (1 << PC4)) != 0;
-}
-
-void MPU6050_init(void) {
-    I2C_start();
-    I2C_write_byte(IMU_ADDRESS << 1); // Write address
-    I2C_write_byte(0x6B);             // Power management register
-    I2C_write_byte(0x00);             // Wake up the MPU6050
-    I2C_stop();
-
-    // Set accelerometer configuration (full scale ±2g)
-    I2C_start();
-    I2C_write_byte(IMU_ADDRESS << 1);
-    I2C_write_byte(0x1C);             // Accelerometer config register
-    I2C_write_byte(0x00);             // ±2g
-    I2C_stop();
-
-    // Set gyroscope configuration (full scale ±250°/s)
-    I2C_start();
-    I2C_write_byte(IMU_ADDRESS << 1);
-    I2C_write_byte(0x1B);             // Gyroscope config register
-    I2C_write_byte(0x00);             // ±250°/s
-    I2C_stop();
-}
-
-void readMPU6050(void) {
-    I2C_start();
-    I2C_write_byte(IMU_ADDRESS << 1); // Write address
-    I2C_write_byte(0x3B);             // Starting register for accelerometer data
-    I2C_stop();
-
-    I2C_start();
-    I2C_write_byte((IMU_ADDRESS << 1) | 1); // Read address
-
-    ax_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
-    ay_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
-    az_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
-    I2C_read_byte(1); I2C_read_byte(1); // Skip temperature
-    gx_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
-    gy_raw = (I2C_read_byte(1) << 8) | I2C_read_byte(1);
-    gz_raw = (I2C_read_byte(0) << 8) | I2C_read_byte(0); // Last byte NACK
-
-    I2C_stop();
-}
-
-void calculateAngles(void) {
-    // Calibrate accelerometer readings
-    Ax_cal = ((float)ax_raw / ACCEL_SCALE) - ax_bias;
-    Ay_cal = ((float)ay_raw / ACCEL_SCALE) - ay_bias;
-    Az_cal = ((float)az_raw / ACCEL_SCALE) - az_bias;
-
-    roll = atan2(Ay_cal, Az_cal) * 180.0 / M_PI;
-    pitch = atan2(-Ax_cal, sqrt(Ay_cal * Ay_cal + Az_cal * Az_cal)) * 180.0 / M_PI;
-
-    // Time difference
-    unsigned long current_time = customMillis();
-    delta_t = (current_time - previous_time) / 1000.0; // Convert ms to s
-    previous_time = current_time;
-
-    // Gyroscope readings
-    float Gz = ((float)gz_raw - gz_bias) / GYRO_SENSITIVITY;
-
-    // Update yaw
-    yaw += Gz * delta_t;
-
-    // Constrain yaw angle within ±180 degrees
-    if (yaw > 180) yaw -= 360;
-    if (yaw < -180) yaw += 360;
+bool isObstacleDetected() {
+    long distance = measureUltrasonicDistance();
+    return distance < DISTANCE_THRESHOLD;
 }
 
 void servo_write(uint16_t angle) {
@@ -308,168 +162,33 @@ void servo_write(uint16_t angle) {
     angle = constrain(angle, 0, 180);
     
     // Convert angle to pulse width (900-2100 microseconds)
+    // 900µs = 1800 timer ticks, 2100µs = 4200 timer ticks
     uint16_t pulse_width = 1000 + ((4000 * (uint32_t)angle) / 180);
     pulse_width = constrain(pulse_width, 1000, 5000);
     
+    
     // Update PWM compare value
     OCR1A = pulse_width;
-}
-
-long measureUltrasonicDistance(void) {
-Serial.println("measure ultrasonic distance");
-    long duration;
-    int distance;
-
-    // Generate trigger pulse
-    PORTB &= ~(1 << TRIG_PIN);
-    _delay_us(2);
-    PORTB |= (1 << TRIG_PIN);
-    _delay_us(10);
-    PORTB &= ~(1 << TRIG_PIN);
-Serial.println("line 328");
-    // Wait for echo
-    while (!(PIND & (1 << ECHO_PIN)));
-    duration = 0;
-    while ((PIND & (1 << ECHO_PIN))) {
-        duration++;
-        _delay_us(1);
-        if (duration > 23200) break; // Timeout after ~4m
-    }
-
-    distance = duration * 0.0344 / 2;
-Serial.print("distance: ");
-Serial.println(distance);
-    return distance;
-}
-
-bool isObstacleDetected(void) {
-    Serial.print("oui");
-    long distance = measureUltrasonicDistance();
-    return (distance < D1);
-}
-
-void scanEnvironment(void) {
-    Serial.println("ScanEnvironment()");
-    float maxDistance = 0;
-    float chosenAngle = 0;
     
-    // Rotate servo to scan surroundings
-    for (int angle = 0; angle <= 180; angle += 45) {
-        servo_write(angle);
-        _delay_ms(500);  // Increased delay to ensure servo reaches position
-        
-        // Evaluate distance using ultrasonic sensor
-        float distance = measureUltrasonicDistance();
-        
-        // Output for testing
-        Serial.print("Distance at ");
-        Serial.print(angle);
-        Serial.print("* degrees is ");
-        Serial.print(distance);
-        Serial.println(" cm");
-        
-        // Don't want to lock onto the wall nearby
-        if (distance > 20 && distance > maxDistance) {
-            maxDistance = distance;
-            chosenAngle = (float)angle;
-        }
-    }
-    
-    // Write the angle with the greatest distance
-    servo_write(chosenAngle);
-    _delay_ms(500);  // Give servo time to reach final position
-    
-    // Output for testing
-    Serial.print("Chosen Angle is ");
-    Serial.print(chosenAngle);
-    Serial.println(" degrees");
+    // Debug output
+    Serial.print("Angle: ");
+    Serial.print(angle);
+    Serial.print(" Pulse width: ");
+    Serial.println(pulse_width);
 }
 
-void startHoverFan(void) {
-    Serial.println("startHoverFan()");
-    PORTD |= (1 << HOVER_FAN_PIN);
-}
 
-void stopHoverFan(void) {
-    Serial.println("stopHoverFan()");
-    PORTD &= ~(1 << HOVER_FAN_PIN);
-}
-
-void startPropulsionFan(uint8_t dutyCycle) {
-    Serial.println("startPropulsionFan()");
-    static uint8_t timerInitialized = 0;
-    if (!timerInitialized) {
-        // Configure Timer0 for Fast PWM, 8-bit mode
-        TCCR0A |= (1 << WGM00) | (1 << WGM01);   // Fast PWM
-        TCCR0A |= (1 << COM0A1);                  // Non-inverting mode on OC0A
-        TCCR0B |= (1 << CS01) | (1 << CS00);      // Prescaler 64
-        timerInitialized = 1;
-    }
-    OCR0A = dutyCycle;
-}
-
-void stopPropulsionFan(void) {
-    Serial.println("stopPropulsionFan()");
-    OCR0A = 0;
-}
-
-/*void adjustServoForStraightLine(void) {
-    // Read new IMU data
-    readMPU6050();
-    calculateAngles();
+void setupPWM() {
+    // Configure Timer1 for PWM generation
+    // Fast PWM mode with ICR1 as TOP
+    TCCR1A = (1 << COM1A1) | (1 << WGM11);
+    TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);
     
-    // Calculate correction angle based on yaw
-    // If yaw is positive (turning right), we need to turn left to compensate
-    // If yaw is negative (turning left), we need to turn right to compensate
-    float correction = -yaw * YAW_CORRECTION_FACTOR;
+    // Set PWM frequency to 50Hz (20ms period)
+    ICR1 = 39999;  // = 16MHz/(8 * 50Hz) - 1
     
-    // Calculate new servo angle (90 is center position)
-    int16_t new_angle = 90 + (int16_t)correction;
-    
-    // Constrain the servo angle
-    new_angle = constrain(new_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
-    
-    // Update servo position
-    servo_write(new_angle);
-}*/
-
-void handleState(void) {
-    switch(currentState) {
-        case INIT:
-            Serial.println("CURRENT STATE INIT");
-            setup();
-            currentState = IDLE;
-            break;
-            
-        case IDLE:
-            Serial.println("CURRENT STATE IDLE");
-            stopPropulsionFan();
-            stopHoverFan();
-            _delay_ms(1000);
-            currentState = SCAN;
-            break;
-            
-        case SCAN:
-            Serial.println("CURRENT STATE SCAN");
-            scanEnvironment();  // This will update state to MOVE if path is clear
-            currentState = MOVE;
-            break;
-            
-        case MOVE:
-            Serial.println("CURRENT STATE MOVE");
-            startHoverFan();
-            startPropulsionFan(255);
-            //adjustServoForStraightLine(); // Maintain straight line using IMU
-            _delay_ms(4000);  // Small delay before next adjustment
-            if (isObstacleDetected()) {
-                currentState = IDLE;
-                break;
-            }
-        //if(goalDetected()==1){
-        //currentState=STOP
-        //}
-            break;
-    }
+    // Initialize servo to middle position
+    OCR1A = 3000;  // ~1.5ms pulse (90 degrees)
 }
 
 void delay_ms(unsigned int ms) {
@@ -479,11 +198,11 @@ void delay_ms(unsigned int ms) {
 
 void delay_us(unsigned int us) {
     while (us--) {
-        _delay_us(1);
+        _delay_us(1); // Use built-in function for accuracy
     }
 }
 
-unsigned long customMillis(void) {
+unsigned long customMillis() {
     unsigned long ms;
     cli();
     ms = milliseconds;
@@ -491,11 +210,12 @@ unsigned long customMillis(void) {
     return ms;
 }
 
-int main(void) {
-    setup();
-    while(1) {
-        handleState();
+// Linear map function for unsigned long
+unsigned long linear_map(unsigned long value, unsigned long in_min, unsigned long in_max, unsigned long out_min, unsigned long out_max) {
+    if (in_max == in_min) {
+        // Avoid division by zero
+        fprintf(stderr, "Error: Input range cannot be zero.\n");
+        return 0;
     }
-    
-    return 0;
+    return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
