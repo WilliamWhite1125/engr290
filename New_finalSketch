@@ -28,7 +28,8 @@
 #define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
 #define YAW_CORRECTION_FACTOR 1.0   // Adjust based on testing
 #define D1 15
-
+#define D2 40
+#define D3 60
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
 // Global Variables
@@ -342,6 +343,10 @@ bool isObstacleDetected(void) {
     return (distance < D1);
 }
 
+bool isGoalDetected(){
+   long distance = measureIRDistance();
+    return (distance>D2)&(distance<D3);
+}
 void scanEnvironment() {
 
 Serial.println("ScanEnvironment()");
