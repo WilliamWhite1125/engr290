@@ -14,19 +14,19 @@
 #define PROPULSION_FAN_PIN PD6    // Propulsion fan (Fan 2) - PWM (0C0A)
 
 // IMU Definitions
-#define IMU_ADDRESS 0x68          // MPU-6050 I2C address
-#define I2C_DELAY_US 5            // I2C communication delay in microseconds
-#define SDA_PIN PC4               // SDA connected to PC4 (Arduino A4)
-#define SCL_PIN PC5               // SCL connected to PC5 (Arduino A5)
-#define GYRO_SENSITIVITY 131.0    // Gyroscope sensitivity scale factor
-#define ACCEL_SCALE 16384.0       // Accelerometer sensitivity scale factor
+#define IMU_ADDRESS 0x68            // MPU-6050 I2C address
+#define I2C_DELAY_US 5              // I2C communication delay in microseconds
+#define SDA_PIN PC4                 // SDA connected to PC4 (Arduino A4)
+#define SCL_PIN PC5                 // SCL connected to PC5 (Arduino A5)
+#define GYRO_SENSITIVITY 131.0      // Gyroscope sensitivity scale factor
+#define ACCEL_SCALE 16384.0         // Accelerometer sensitivity scale factor
 
 // Control Parameters
-#define D1 40                     // Reference distance for US sensor
-#define MIN_SERVO_ANGLE 0         // Minimum servo angle
-#define MAX_SERVO_ANGLE 180       // Maximum servo angle
-#define DISTANCE_THRESHOLD 30     // (cm) Adjust based on testing results
-#define YAW_CORRECTION_FACTOR 1.0 // Adjust based on testing
+#define D1 15                       // Reference distance for US sensor
+#define MIN_SERVO_ANGLE 0           // Minimum servo angle
+#define MAX_SERVO_ANGLE 180         // Maximum servo angle
+#define DISTANCE_THRESHOLD 30       // (cm) Adjust based on testing results
+#define YAW_CORRECTION_FACTOR 1.0   // Adjust based on testing
 
 #define constrain(x, a, b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 
