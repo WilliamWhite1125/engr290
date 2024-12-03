@@ -427,7 +427,7 @@ void adjustServoForStraightLine(void) {
     servo_angle += (int16_t)correction;
     
     // Constrain the servo angle
-    servo_angle = constrain(new_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
+    servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
     
     // Update servo position
     servo_write(servo_angle);
