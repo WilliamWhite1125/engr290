@@ -512,7 +512,6 @@ void delay_us(unsigned int us) {
         _delay_us(1);
     }
 }
-
 unsigned long customMillis(void) {
     unsigned long ms;
     cli();
