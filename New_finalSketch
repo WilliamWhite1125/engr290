@@ -377,7 +377,6 @@ bool isGoalDetected(void){
 bool isObstacleDetected(void) {
     long distance = measureUltrasonicDistance();
     if(distance < D1){
-        lastObstacleCheckTime = 0;
         return true;
     }else {
         return false;
