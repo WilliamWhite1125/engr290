@@ -501,7 +501,7 @@ void handleState(void) {
                 currentState = IDLE;
             }
         if(isGoalDetected()==1){
-        currentState=STOP
+        currentState=STOP;
         }
         break;
 
