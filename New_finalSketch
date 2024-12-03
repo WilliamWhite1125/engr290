@@ -70,6 +70,7 @@ void servo_write(uint16_t angle);
 long measureUltrasonicDistance(void);
 void handleState(void);
 bool isObstacleDetected(void);
+bool isGoalDetected(void);
 void scanEnvironment(void);
 void startHoverFan(void);
 void stopHoverFan(void);
@@ -342,6 +343,10 @@ Serial.println(distance);
     return distance;
 }
 
+bool isGoalDetected(void){
+   long distance = measureIRDistance();
+    return (distance>D2)&&(distance<D3);
+}
 bool isObstacleDetected(void) {
     Serial.print("oui");
     long distance = measureUltrasonicDistance();
@@ -465,9 +470,9 @@ void handleState(void) {
                 currentState = IDLE;
                 break;
             }
-        //if(goalDetected()==1){
-        //currentState=STOP
-        //}
+        if(isGoalDetected()==1){
+        currentState=STOP
+        }
             break;
     }
 }
