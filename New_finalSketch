@@ -35,7 +35,7 @@
 // Global Variables
 volatile unsigned long milliseconds = 0;
 uint16_t servo_angle = 90;
-enum State { INIT, IDLE, SCAN, MOVE };
+enum State { INIT, IDLE, SCAN, MOVE, STOP };
 State currentState = INIT;
 float currentSpeed = 0;
 unsigned long previous_time = 0;
