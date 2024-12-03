@@ -482,7 +482,12 @@ void handleState(void) {
             stopPropulsionFan();
             stopHoverFan();
             _delay_ms(1000);
+            if(isObstacleDetected()){
             currentState = SCAN;
+            }else{
+              currentState = 
+              MOVE;
+              }
             break;
             
         case SCAN:
@@ -495,7 +500,7 @@ void handleState(void) {
             Serial.println("CURRENT STATE MOVE");
             startHoverFan();
             startPropulsionFan(255);
-            adjustServoForStraightLine(); // Maintain straight line using IMU
+            //adjustServoForStraightLine(); // Maintain straight line using IMU
             _delay_ms(4000);  // Small delay before next adjustment
             if (isObstacleDetected()) {
                 currentState = IDLE;
