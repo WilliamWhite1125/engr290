@@ -67,6 +67,7 @@ void MPU6050_init(void);
 void readMPU6050(void);
 void calculateAngles(void);
 void servo_write(uint16_t angle);
+float measureIRDistance(void);
 long measureUltrasonicDistance(void);
 void handleState(void);
 bool isObstacleDetected(void);
@@ -315,6 +316,35 @@ void servo_write(uint16_t angle) {
     // Update PWM compare value
     OCR1A = pulse_width;
 }
+float measureIRDistance(void) {
+    // Take multiple readings for stability
+    const int numReadings = 5;
+    long sum = 0;
+    
+    for(int i = 0; i < numReadings; i++) {
+        ADMUX = (1 << REFS0) | (IR_PIN & 0x0F); // Set reference voltage to AVCC
+        ADCSRA |= (1 << ADSC);  
+        while (ADCSRA & (1 << ADSC));  // Wait for conversion
+        sum += ADC;
+        _delay_ms(10); // Small delay between readings
+    }
+    
+    int reading = sum / numReadings;
+    float voltage = reading * (5.0 / 1024.0);
+    
+    // Improved distance calculation for GP2Y0A02YK0F
+    // Based on datasheet curve fitting
+    float distance = 65.0 * pow(voltage, -1.10);
+    
+    // Implement noise filtering
+    static float lastDistance = 0;
+    if (lastDistance != 0) {
+        // Simple low-pass filter
+        distance = 0.7 * distance + 0.3 * lastDistance;
+    }
+    lastDistance = distance;
+    return distance;
+}
 
 long measureUltrasonicDistance(void) {
 Serial.println("measure ultrasonic distance");
@@ -342,6 +372,7 @@ Serial.print("distance: ");
 Serial.println(distance);
     return distance;
 }
+
 
 bool isGoalDetected(void){
    long distance = measureIRDistance();
