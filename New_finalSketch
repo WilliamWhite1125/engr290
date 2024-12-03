@@ -468,12 +468,16 @@ void handleState(void) {
             _delay_ms(4000);  // Small delay before next adjustment
             if (isObstacleDetected()) {
                 currentState = IDLE;
-                break;
             }
         if(isGoalDetected()==1){
         currentState=STOP
         }
-            break;
+        break;
+
+        case STOP:
+            stopHoverFan();
+            stopPropultionFan();
+        break;
     }
 }
 
