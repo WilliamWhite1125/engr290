@@ -507,7 +507,7 @@ void handleState(void) {
 
         case STOP:
             stopHoverFan();
-            stopPropultionFan();
+            stopPropulsionFan();
         break;
     }
 }
