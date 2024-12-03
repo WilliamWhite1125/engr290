@@ -424,13 +424,13 @@ void adjustServoForStraightLine(void) {
     float correction = -yaw * YAW_CORRECTION_FACTOR;
     
     // Calculate new servo angle (90 is center position)
-    int16_t new_angle = 90 + (int16_t)correction;
+    servo_angle += (int16_t)correction;
     
     // Constrain the servo angle
-    new_angle = constrain(new_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
+    servo_angle = constrain(new_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
     
     // Update servo position
-    servo_write(new_angle);
+    servo_write(servo_angle);
 }
 
 void handleState(void) {
