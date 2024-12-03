@@ -39,6 +39,7 @@ enum State { INIT, IDLE, SCAN, MOVE, STOP };
 State currentState = INIT;
 float currentSpeed = 0;
 unsigned long previous_time = 0;
+static unsigned long lastObstacleCheckTime = 0;
 
 // IMU Variables
 int16_t gx_raw, gy_raw, gz_raw;
@@ -96,8 +97,7 @@ void setup(void) {
     DDRD |= (1 << PROPULSION_FAN_PIN); // Propulsion fan output
     DDRB |= (1 << SERVO_PIN);     // Servo output
 
-Serial.begin(9600);
-currentSpeed = 255;
+    currentSpeed = 255;
 
     // Setup Timer2 for milliseconds
     TCCR2A = (1 << WGM21);  // CTC mode
@@ -347,7 +347,6 @@ float measureIRDistance(void) {
 }
 
 long measureUltrasonicDistance(void) {
-Serial.println("measure ultrasonic distance");
     long duration;
     int distance;
 
@@ -357,7 +356,6 @@ Serial.println("measure ultrasonic distance");
     PORTB |= (1 << TRIG_PIN);
     _delay_us(10);
     PORTB &= ~(1 << TRIG_PIN);
-Serial.println("line 328");
     // Wait for echo
     while (!(PIND & (1 << ECHO_PIN)));
     duration = 0;
@@ -368,8 +366,6 @@ Serial.println("line 328");
     }
 
     distance = duration * 0.0344 / 2;
-Serial.print("distance: ");
-Serial.println(distance);
     return distance;
 }
 
@@ -379,13 +375,17 @@ bool isGoalDetected(void){
     return (distance>D2)&&(distance<D3);
 }
 bool isObstacleDetected(void) {
-    Serial.print("oui");
     long distance = measureUltrasonicDistance();
-    return (distance < D1);
+    if(distance < D1){
+        lastObstacleCheckTime = 0;
+        return true;
+    }else {
+        return false;
+    }
+    
 }
 
 void scanEnvironment(void) {
-    Serial.println("ScanEnvironment()");
     float maxDistance = 0;
     float chosenAngle = 0;
     
@@ -397,13 +397,6 @@ void scanEnvironment(void) {
         // Evaluate distance using ultrasonic sensor
         float distance = measureUltrasonicDistance();
         
-        // Output for testing
-        Serial.print("Distance at ");
-        Serial.print(angle);
-        Serial.print("* degrees is ");
-        Serial.print(distance);
-        Serial.println(" cm");
-        
         // Don't want to lock onto the wall nearby
         if (distance > 20 && distance > maxDistance) {
             maxDistance = distance;
@@ -414,25 +407,17 @@ void scanEnvironment(void) {
     // Write the angle with the greatest distance
     servo_write(chosenAngle);
     _delay_ms(500);  // Give servo time to reach final position
-    
-    // Output for testing
-    Serial.print("Chosen Angle is ");
-    Serial.print(chosenAngle);
-    Serial.println(" degrees");
 }
 
 void startHoverFan(void) {
-    Serial.println("startHoverFan()");
     PORTD |= (1 << HOVER_FAN_PIN);
 }
 
 void stopHoverFan(void) {
-    Serial.println("stopHoverFan()");
     PORTD &= ~(1 << HOVER_FAN_PIN);
 }
 
 void startPropulsionFan(uint8_t dutyCycle) {
-    Serial.println("startPropulsionFan()");
     static uint8_t timerInitialized = 0;
     if (!timerInitialized) {
         // Configure Timer0 for Fast PWM, 8-bit mode
@@ -445,7 +430,6 @@ void startPropulsionFan(uint8_t dutyCycle) {
 }
 
 void stopPropulsionFan(void) {
-    Serial.println("stopPropulsionFan()");
     OCR0A = 0;
 }
 void adjustServoForStraightLine(void) {
@@ -473,13 +457,11 @@ void adjustServoForStraightLine(void) {
 void handleState(void) {
     switch(currentState) {
         case INIT:
-            Serial.println("CURRENT STATE INIT");
             setup();
             currentState = IDLE;
             break;
             
         case IDLE:
-            Serial.println("CURRENT STATE IDLE");
             stopPropulsionFan();
             stopHoverFan();
             _delay_ms(1000);
@@ -492,23 +474,26 @@ void handleState(void) {
             break;
             
         case SCAN:
-            Serial.println("CURRENT STATE SCAN");
             scanEnvironment();  // This will update state to MOVE if path is clear
             currentState = MOVE;
             break;
             
         case MOVE:
-            Serial.println("CURRENT STATE MOVE");
             startHoverFan();
             startPropulsionFan(255);
             //adjustServoForStraightLine(); // Maintain straight line using IMU
-            _delay_ms(4000);  // Small delay before next adjustment
-            if (isObstacleDetected()) {
-                currentState = IDLE;
+
+            // Non-blocking delay for obstacle detection
+            unsigned long currentTime = customMillis();
+            // Check for obstacles only after a delay 
+            if (currentTime - lastObstacleCheckTime > 2000) { 
+                lastObstacleCheckTime = currentTime; // Update last check time
+             if (isObstacleDetected()) {
+                currentState = IDLE; // Stop and transition to SCAN state
             }
-        if(isGoalDetected()==1){
-        currentState=STOP;
-        }
+            if(isGoalDetected()==1){
+            currentState=STOP;
+            }
         break;
 
         case STOP:
