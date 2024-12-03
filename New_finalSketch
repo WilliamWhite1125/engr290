@@ -291,7 +291,7 @@ void adjustServoForStraightLine(void) {
     
     float correction = -yaw * YAW_CORRECTION_FACTOR;
 
-    if(correction > 10.0) {
+    if(correction > 5.0) {
         servo_angle += (int16_t)correction;
         servo_angle = constrain(servo_angle, MIN_SERVO_ANGLE, MAX_SERVO_ANGLE);
         servo_write(servo_angle);
