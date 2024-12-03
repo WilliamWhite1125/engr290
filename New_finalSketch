@@ -448,7 +448,6 @@ void stopPropulsionFan(void) {
     Serial.println("stopPropulsionFan()");
     OCR0A = 0;
 }
-
 void adjustServoForStraightLine(void) {
     // Read new IMU data
     readMPU6050();
@@ -458,7 +457,8 @@ void adjustServoForStraightLine(void) {
     // If yaw is positive (turning right), we need to turn left to compensate
     // If yaw is negative (turning left), we need to turn right to compensate
     float correction = -yaw * YAW_CORRECTION_FACTOR;
-    
+
+    if(correction > 10.0){
     // Calculate new servo angle (90 is center position)
     servo_angle += (int16_t)correction;
     
@@ -467,6 +467,7 @@ void adjustServoForStraightLine(void) {
     
     // Update servo position
     servo_write(servo_angle);
+    }
 }
 
 void handleState(void) {
